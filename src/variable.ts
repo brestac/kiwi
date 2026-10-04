@@ -88,7 +88,7 @@ export class Variable {
 	 * changes.
 	 */
 	public unsubscribe(): void {
-		this._callback = null
+		this._callback = undefined
 	}
 
 	/**
@@ -150,9 +150,9 @@ export class Variable {
 
 	private _name: string
 	private _value: number = 0.0
-	private _context: any = null
+	private _context: any = undefined
 	private _id: number = VarId++
-	private _callback: (value: number, previousValue: number) => void
+	private _callback: ((value: number, previousValue: number) => void) | undefined
 }
 
 /**

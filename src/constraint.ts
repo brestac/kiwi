@@ -40,7 +40,12 @@ export class Constraint {
 	) {
 		this._operator = operator
 		this._strength = Strength.clip(strength)
-		if (rhs === undefined && expression instanceof Expression) {
+
+		if (expression instanceof Variable) {
+			expression = new Expression(expression)
+		}
+
+		if (rhs === undefined) {
 			this._expression = expression
 		} else {
 			this._expression = expression.minus(rhs)
