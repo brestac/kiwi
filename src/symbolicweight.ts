@@ -13,8 +13,8 @@ export const LEVEL_COUNT = 8
  * @private
  */
 function nearZeroValue(value: number): boolean {
-	let eps = 1.0e-8
-	return value < 0 ? -value < eps : value < eps
+  let eps = 1.0e-8
+  return value < 0 ? -value < eps : value < eps
 }
 
 /**
@@ -39,118 +39,138 @@ function nearZeroValue(value: number): boolean {
  * @private
  */
 export class SymbolicWeight {
-	private constructor(private readonly _levels: readonly number[]) {}
+  private constructor(private readonly _levels: Uint32Array) {}
 
-	/**
-	 * The zero weight (identity for `plus`/`minus`).
-	 */
-	static readonly zero = new SymbolicWeight(new Array(LEVEL_COUNT).fill(0))
+  /**
+   * The zero weight (identity for `plus`/`minus`).
+   */
+  static readonly zero = new SymbolicWeight(new Uint32Array(LEVEL_COUNT).fill(0))
 
-	/**
-	 * A sentinel weight greater than any weight reachable through
-	 * normal construction and arithmetic. Used internally as the
-	 * initial "nothing found yet" value in ratio-minimization loops.
-	 */
-	static readonly infinity = new SymbolicWeight(new Array(LEVEL_COUNT).fill(Infinity))
+  /**
+   * A sentinel weight greater than any weight reachable through
+   * normal construction and arithmetic. Used internally as the
+   * initial "nothing found yet" value in ratio-minimization loops.
+   */
+  static readonly infinity = new SymbolicWeight(new Uint32Array(LEVEL_COUNT).fill(0xFFFFFFFF))
 
-	/**
-	 * Construct a weight with `weight` at the given `level` and zero
-	 * everywhere else.
-	 *
-	 * @private
-	 */
-	static create(level: number, weight: number = 1.0): SymbolicWeight {
-		if (!Number.isInteger(level) || level > LEVEL_COUNT - 1) {
-			throw new Error(`strength level must be an integer between 1 and ${LEVEL_COUNT - 1}`)
-		}
+  /**
+   * Construct a weight with `weight` at the given `level` and zero
+   * everywhere else.
+   *
+   * @private
+   */
+  static create(level: number, weight: number = 1): SymbolicWeight {
+    if (!Number.isInteger(level) || level < 0 || level > LEVEL_COUNT - 1) {
+      throw new Error(`strength level must be an integer between 0 and ${LEVEL_COUNT - 1}, was ${level}`)
+    }
 
-		let levels = new Array(LEVEL_COUNT).fill(0)
-		levels[level] = weight
+    if (!Number.isInteger(weight) || weight < 0 || weight > Math.pow(2, 31) - 1) {
+      throw new Error(`strength weight must be an integer between 0 and 2^31 - 1, was ${weight}`)
+    }
 
-		return new SymbolicWeight(levels)
-	}
+    let levels = new Uint32Array(LEVEL_COUNT).fill(0)
+    levels[level] = weight
 
-	/**
-	 * Component-wise sum.
-	 */
-	plus(other: SymbolicWeight): SymbolicWeight {
-		return new SymbolicWeight(this._levels.map((v, i) => v + other._levels[i]))
-	}
+    return new SymbolicWeight(levels)
+  }
 
-	/**
-	 * Component-wise difference.
-	 */
-	minus(other: SymbolicWeight): SymbolicWeight {
-		return new SymbolicWeight(this._levels.map((v, i) => v - other._levels[i]))
-	}
+  /**
+   * Component-wise sum.
+   */
+  plus(other: SymbolicWeight): SymbolicWeight {
+    return new SymbolicWeight(this._levels.map((v, i) => v + other._levels[i]))
+  }
 
-	/**
-	 * Multiply every level by a plain scalar.
-	 */
-	multiply(scalar: number): SymbolicWeight {
-		return new SymbolicWeight(this._levels.map(v => v * scalar))
-	}
+  /**
+   * Component-wise difference.
+   */
+  minus(other: SymbolicWeight): SymbolicWeight {
+    return new SymbolicWeight(this._levels.map((v, i) => v - other._levels[i]))
+  }
 
-	/**
-	 * Divide every level by a plain scalar.
-	 */
-	divide(scalar: number): SymbolicWeight {
-		return this.multiply(1.0 / scalar)
-	}
+  /**
+   * Multiply every level by a plain scalar.
+   */
+  multiply(scalar: number): SymbolicWeight {
+    return new SymbolicWeight(this._levels.map(v => v * scalar))
+  }
 
-	/**
-	 * The additive inverse.
-	 */
-	negate(): SymbolicWeight {
-		return this.multiply(-1.0)
-	}
+  /**
+   * Divide every level by a plain scalar.
+   */
+  divide(scalar: number): SymbolicWeight {
+    return this.multiply(1.0 / scalar)
+  }
 
-	/**
-	 * Whether this weight is negative in the lexicographic order: the
-	 * first level that isn't approximately zero is itself negative.
-	 */
-	isNegative(): boolean {
-		for (let i = 0; i < LEVEL_COUNT; i++) {
-			if (!nearZeroValue(this._levels[i])) {
-				return this._levels[i] < 0
-			}
-		}
-		return false
-	}
+  /**
+   * The additive inverse.
+   */
+  negate(): SymbolicWeight {
+    return this.multiply(-1.0)
+  }
 
-	/**
-	 * Whether this weight is approximately zero at every level.
-	 */
-	nearZero(): boolean {
-		for (let i = 0; i < LEVEL_COUNT; i++) {
-			if (!nearZeroValue(this._levels[i])) {
-				return false
-			}
-		}
-		return true
-	}
+  /**
+   * Whether this weight is negative in the lexicographic order: the
+   * first level that isn't approximately zero is itself negative.
+   */
+  isNegative(): boolean {
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      if (!nearZeroValue(this._levels[i])) {
+        return this._levels[i] < 0
+      }
+    }
+    return false
+  }
 
-	/**
-	 * Strict lexicographic less-than.
-	 */
-	lessThan(other: SymbolicWeight): boolean {
-		for (let i = 0; i < LEVEL_COUNT; i++) {
-			let diff = this._levels[i] - other._levels[i]
-			if (!nearZeroValue(diff)) {
-				return diff < 0
-			}
-		}
-		return false
-	}
+  /**
+   * Whether this weight is approximately zero at every level.
+   */
+  nearZero(): boolean {
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      if (!nearZeroValue(this._levels[i])) {
+        return false
+      }
+    }
+    return true
+  }
 
-	/**
-	 * Approximate equality at every level.
-	 */
-	equals(other: SymbolicWeight): boolean {
-		return this.minus(other).nearZero()
-	}
+  /**
+   * Strict lexicographic less-than.
+   */
+  lessThan(other: SymbolicWeight): boolean {
+    for (let i = 0; i < LEVEL_COUNT; i++) {
+      let diff = this._levels[i] - other._levels[i]
+      if (!nearZeroValue(diff)) {
+        return diff < 0
+      }
+    }
+    return false
+  }
 
-	public toString(): string {
-		return '[' + this._levels.join(', ') + ']'
-	}
+  /**
+   * Approximate equality at every level.
+   */
+  equals(other: SymbolicWeight): boolean {
+    return this.minus(other).nearZero()
+  }
+
+  public toString(): string {
+    return '(' + this._levels.join(', ') + ')'
+  }
+
+  public toJSON() : Uint32Array {
+    return this._levels
+  }
+
+  static fromJSON(levels: any) {
+    return new SymbolicWeight(levels)
+  }
+
+  public toBinary() : Int32Array {
+    return new Int32Array(this._levels)
+  }
+
+  static fromBinary(data: Int32Array) {
+    return new SymbolicWeight(new Uint32Array(data))
+  }
 }

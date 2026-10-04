@@ -1,6 +1,6 @@
 import {Expression} from './expression.js'
 
-type Callback = (value: number, previousValue: number) => void
+export type Callback = (value: number, previousValue: number) => void
 /**
  * The primary user constraint variable.
  *
@@ -8,152 +8,190 @@ type Callback = (value: number, previousValue: number) => void
  * @param {String} [name=""] The name to associated with the variable.
  */
 export class Variable {
-	constructor(name: string = '') {
-		this._name = name
-	}
+  constructor(name: string = '') {
+    this._name = name
+  }
 
-	/**
-	 * Returns the unique id number of the variable.
-	 * @private
-	 */
-	public id(): number {
-		return this._id
-	}
+  /**
+   * Returns the unique id number of the variable.
+   * @private
+   */
+  public id(): number {
+    return this._id
+  }
 
-	/**
-	 * Returns the name of the variable.
-	 *
-	 * @return {String} name of the variable
-	 */
-	public name(): string {
-		return this._name
-	}
+  /**
+   * Returns the name of the variable.
+   *
+   * @return {String} name of the variable
+   */
+  public name(): string {
+    return this._name
+  }
 
-	/**
-	 * Set the name of the variable.
-	 *
-	 * @param {String} name Name of the variable
-	 */
-	public setName(name: string): void {
-		this._name = name
-	}
+  /**
+   * Set the name of the variable.
+   *
+   * @param {String} name Name of the variable
+   */
+  public setName(name: string): void {
+    this._name = name
+  }
 
-	/**
-	 * Returns the user context object of the variable.
-	 * @private
-	 */
-	public context(): any {
-		return this._context
-	}
+  /**
+   * Returns the user context object of the variable.
+   * @private
+   */
+  public context(): any {
+    return this._context
+  }
 
-	/**
-	 * Set the user context object of the variable.
-	 * @private
-	 */
-	public setContext(context: any): void {
-		this._context = context
-	}
+  /**
+   * Set the user context object of the variable.
+   * @private
+   */
+  public setContext(context: any): void {
+    this._context = context
+  }
 
-	/**
-	 * Returns the value of the variable.
-	 *
-	 * @return {Number} Calculated value
-	 */
-	public value(): number {
-		return this._value
-	}
+/**
+   * Returns the value of the variable.
+   *
+   * @return {Number} Calculated value
+   */
+  public value(): number {
+    return this._value
+  }
 
-	/**
-	 * Set the value of the variable.
-	 * @private
-	 */
-	public setValue(value: number): void {
-		var previousValue = this._value
-		this._value = value
-		if (this._callback && previousValue !== value) {
-			this._callback(value, previousValue)
-		}
-	}
+  /**
+   * Set the value of the variable.
+   * @private
+   */
+  public setValue(value: number): void {
+    var previousValue = this._value
+    this._value = value
+    if (this._callback && previousValue !== value) {
+      this._callback(value, previousValue)
+    }
+  }
 
-	/**
-	 * Set a callback for whenever the value changes.
-	 *
-	 * @param {function(number,number):void} callback to call whenever the variable value changes
-	 */
-	public subscribe(callback: Callback): void {
-		this._callback = callback
-	}
+  /**
+   * Set a callback for whenever the value changes.
+   *
+   * @param {function(any):void} callback to call whenever the variable value changes
+   */
+  public subscribe(callback: Callback): void {
+    this._callback = callback
+  }
 
-	/**
-	 * Stops the variable from calling the callback when the variable value
-	 * changes.
-	 */
-	public unsubscribe(): void {
-		this._callback = undefined
-	}
+  /**
+   * Stops the variable from calling the callback when the variable value
+   * changes.
+   */
+  public unsubscribe(): void {
+    this._callback = undefined
+  }
 
-	/**
-	 * Creates a new Expression by adding a number, variable or expression
-	 * to the variable.
-	 *
-	 * @param {Number|Variable|Expression} value Value to add.
-	 * @return {Expression} expression
-	 */
-	public plus(value: number | Variable | Expression): Expression {
-		return new Expression(this, value)
-	}
+  /**
+   * Creates a new Expression by adding a number, variable or expression
+   * to the variable.
+   *
+   * @param {Number|Variable|Expression} value Value to add.
+   * @return {Expression} expression
+   */
+  public plus(value: number | Variable | Expression): Expression {
+    return new Expression(this, value)
+  }
 
-	/**
-	 * Creates a new Expression by substracting a number, variable or expression
-	 * from the variable.
-	 *
-	 * @param {Number|Variable|Expression} value Value to substract.
-	 * @return {Expression} expression
-	 */
-	public minus(value: number | Variable | Expression): Expression {
-		return new Expression(this, typeof value === 'number' ? -value : [-1, value])
-	}
+  /**
+   * Creates a new Expression by substracting a number, variable or expression
+   * from the variable.
+   *
+   * @param {Number|Variable|Expression} value Value to substract.
+   * @return {Expression} expression
+   */
+  public minus(value: number | Variable | Expression): Expression {
+    return new Expression(this, typeof value === 'number' ? -value : [-1, value])
+  }
 
-	/**
-	 * Creates a new Expression by multiplying with a fixed number.
-	 *
-	 * @param {Number} coefficient Coefficient to multiply with.
-	 * @return {Expression} expression
-	 */
-	public multiply(coefficient: number): Expression {
-		return new Expression([coefficient, this])
-	}
+  /**
+   * Creates a new Expression by multiplying with a fixed number.
+   *
+   * @param {Number} coefficient Coefficient to multiply with.
+   * @return {Expression} expression
+   */
+  public multiply(coefficient: number): Expression {
+    return new Expression([coefficient, this])
+  }
 
-	/**
-	 * Creates a new Expression by dividing with a fixed number.
-	 *
-	 * @param {Number} coefficient Coefficient to divide by.
-	 * @return {Expression} expression
-	 */
-	public divide(coefficient: number): Expression {
-		return new Expression([1 / coefficient, this])
-	}
+  /**
+   * Creates a new Expression by dividing with a fixed number.
+   *
+   * @param {Number} coefficient Coefficient to divide by.
+   * @return {Expression} expression
+   */
+  public divide(coefficient: number): Expression {
+    return new Expression([1 / coefficient, this])
+  }
 
-	/**
-	 * Returns the JSON representation of the variable.
-	 * @private
-	 */
-	public toJSON(): any {
-		return {
-			name: this._name,
-			value: this._value,
-		}
-	}
+  /**
+   * Returns the JSON representation of the variable.
+   * @private
+   */
+  public toJSON(): any {
+    return {
+      id: this._id,
+      value: this._value,
+      sharedVarIndex: this._sharedVarIndex,
+      notify: this._notify,
+      name: this._name,
+      context: this._context
+    }
+  }
 
-	public toString(): string {
-		return this._context + '[' + this._name + ':' + this._value + ']'
-	}
+  static fromJSON(json: any) : Variable {
+    let variable = new Variable()
+    variable._id = json.id
+    variable._value = json.value
+    variable._sharedVarIndex = json.sharedVarIndex
+    variable._notify = json.notify
+    variable._name = json.name
+    variable._context  = json.context
 
-	private _name: string
-	private _value: number = 0.0
-	private _context: any = undefined
-	private _id: number = VarId++
-	public _callback: Callback | undefined = undefined
+    return variable
+  }
+
+  public toBinary(): Int32Array {
+    return new Int32Array([
+      this._id,
+      this._value,
+      this._sharedVarIndex,
+      this._notify
+    ])
+  }
+
+  static fromBinary(data: Int32Array) : Variable {
+    let variable = new Variable()
+    variable._id = data.at(0) as number
+    variable._value = data.at(1) as number
+    variable._sharedVarIndex = data.at(2) as number
+    variable._notify = data.at(3) as number
+
+    return variable
+  }
+
+  public toString(): string {
+    const owner = this._context?.owner;
+    return '[' + (owner ? (owner + '.') : '') + this._name + ':' + this._value + ']'
+  }
+
+  private _name: string
+  private _value: number = 0.0
+  private _context: any = undefined
+  private _id: number = VarId++
+  private _callback: Callback | undefined = undefined
+  public _sharedVarIndex: number = -1
+  public _notify: number = 0
 }
 
 /**
