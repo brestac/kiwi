@@ -46,7 +46,7 @@ export class Solver {
 	 *
 	 * @param {Constraint} constraint Constraint to add to the solver
 	 */
-	public addConstraint(constraint: Constraint): void {
+	public addConstraint(constraint: Constraint, shouldOptimize: boolean = true): void {
 		let cnPair = this._cnMap.find(constraint)
 		if (cnPair !== undefined) {
 			throw new Error('duplicate constraint')
@@ -95,7 +95,7 @@ export class Solver {
 		// Optimizing after each constraint is added performs less
 		// aggregate work due to a smaller average system size. It
 		// also ensures the solver remains in a consistent state.
-		this._optimize(this._objective)
+		if (shouldOptimize) this._optimize(this._objective)
 	}
 
 	/**
@@ -103,7 +103,7 @@ export class Solver {
 	 *
 	 * @param {Constraint} constraint Constraint to remove from the solver
 	 */
-	public removeConstraint(constraint: Constraint): void {
+	public removeConstraint(constraint: Constraint, shouldOptimize: boolean = true): void {
 		let cnPair = this._cnMap.erase(constraint)
 		if (cnPair === undefined) {
 			throw new Error('unknown constraint')
@@ -124,15 +124,17 @@ export class Solver {
 				throw new Error('failed to find leaving row')
 			}
 			rowPair = this._rowMap.erase(leaving)
-			if (rowPair !== undefined) {
-				rowPair.second.solveForEx(leaving, marker)
-				this._substitute(marker, rowPair.second)
+			if (rowPair == undefined) {
+					throw new Error('failed to erase leaving row')
 			}
+			rowPair.second.solveForEx(leaving, marker)
+			this._substitute(marker, rowPair.second)
 		}
 
 		// Optimizing after each constraint is removed ensures that the
 		// solver remains consistent. It makes the solver api easier to
 		// use at a small tradeoff for speed.
+		if (shouldOptimize) this._optimize(this._objective)
 		this._optimize(this._objective)
 	}
 
@@ -474,6 +476,9 @@ export class Solver {
 		}
 	}
 
+	public optimize(): void {
+		this._optimize(this._objective)
+	}
 	/**
 	 * Optimize the system for the given objective function.
 	 *
