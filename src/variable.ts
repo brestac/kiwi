@@ -1,5 +1,6 @@
 import {Expression} from './expression.js'
 
+type Callback = (value: number, previousValue: number) => void
 /**
  * The primary user constraint variable.
  *
@@ -79,7 +80,7 @@ export class Variable {
 	 *
 	 * @param {function(number,number):void} callback to call whenever the variable value changes
 	 */
-	public subscribe(callback: (value: number, previousValue: number) => void): void {
+	public subscribe(callback: Callback): void {
 		this._callback = callback
 	}
 
@@ -152,7 +153,7 @@ export class Variable {
 	private _value: number = 0.0
 	private _context: any = undefined
 	private _id: number = VarId++
-	private _callback: ((value: number, previousValue: number) => void) | undefined
+	public _callback: Callback | undefined = undefined
 }
 
 /**
