@@ -37,7 +37,7 @@ declare class IndexedMap<T extends {
      *
      * @param key The key to locate in the array.
      */
-    find(key: T): Pair<T, U>;
+    find(key: T): Pair<T, U> | undefined;
     /**
      * Returns the pair associated with the key if it exists.
      *
@@ -62,7 +62,7 @@ declare class IndexedMap<T extends {
      *
      * @param key The key to remove from the map.
      */
-    erase(key: T): Pair<T, U>;
+    erase(key: T): Pair<T, U> | undefined;
     /**
      * Create a copy of this associative array.
      */

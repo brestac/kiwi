@@ -78,7 +78,7 @@ export class Variable {
      * changes.
      */
     unsubscribe() {
-        this._callback = null;
+        this._callback = undefined;
     }
     /**
      * Creates a new Expression by adding a number, variable or expression
@@ -133,9 +133,9 @@ export class Variable {
     }
     _name;
     _value = 0.0;
-    _context = null;
+    _context = undefined;
     _id = VarId++;
-    _callback;
+    _callback = undefined;
 }
 /**
  * The internal variable id counter.
