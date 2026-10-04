@@ -88,6 +88,28 @@ export class Constraint {
 		return this._strength
 	}
 
+	/**
+	 * Set the strength of the constraint.
+	 *
+	 * Intended to be called only by the Solver when incrementally
+	 * updating a non-required constraint's strength.
+	 * @private
+	 */
+	public setStrength(strength: SymbolicWeight): void {
+		this._strength = strength
+	}
+
+	/**
+	 * Set the constant of the constraint's expression.
+	 *
+	 * Intended to be called only by the Solver when incrementally
+	 * updating a constraint already present in the solver.
+	 * @private
+	 */
+	public setConstant(constant: number): void {
+		this._expression.setConstant(constant)
+	}
+
 	public toString(): string {
 		return (
 			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 (' + this._strength.toString() + ')'
