@@ -1,5 +1,6 @@
 import { Expression } from './expression.js';
 import { Strength } from './strength.js';
+import { Variable } from './variable.js';
 /**
  * An enum defining the linear constraint operators.
  *
@@ -33,7 +34,10 @@ export class Constraint {
     constructor(expression, operator, rhs, strength = Strength.required) {
         this._operator = operator;
         this._strength = Strength.clip(strength);
-        if (rhs === undefined && expression instanceof Expression) {
+        if (expression instanceof Variable) {
+            expression = new Expression(expression);
+        }
+        if (rhs === undefined) {
             this._expression = expression;
         }
         else {

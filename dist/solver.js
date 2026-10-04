@@ -150,9 +150,11 @@ export class Solver {
         let expr = new Expression(variable);
         let cn = new Constraint(expr, Operator.Eq, undefined, strength);
         this.addConstraint(cn);
-        let tag = this._cnMap.find(cn).second;
-        let info = { tag, constraint: cn, constant: 0.0 };
-        this._editMap.insert(variable, info);
+        let pair = this._cnMap.find(cn);
+        if (pair !== undefined) {
+            let info = { tag: pair.second, constraint: cn, constant: 0.0 };
+            this._editMap.insert(variable, info);
+        }
     }
     /**
      * Remove an edit variable from the solver.
@@ -381,7 +383,7 @@ export class Solver {
         // only if the artificial objective is optimized to zero.
         this._optimize(this._artificial);
         let success = nearZero(this._artificial.constant());
-        this._artificial = null;
+        this._artificial = undefined;
         // If the artificial variable is basic, pivot the row so that
         // it becomes non-basic. If the row is constant, exit early.
         let pair = this._rowMap.erase(art);

@@ -95,7 +95,7 @@ class IndexedMap {
         this.index[key.id()] = undefined;
         const pair = this.array[i];
         const last = this.array.pop();
-        if (pair !== last) {
+        if (pair !== undefined && last !== undefined && pair !== last) {
             this.array[i] = last;
             this.index[last.first.id()] = i;
         }
