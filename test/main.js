@@ -345,8 +345,10 @@ describe('import kiwi', function () {
 
 				// A single level-6 constraint with a large weight still
 				// never outweighs a single level-5 (stronger) constraint.
-				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.create(5)))
-				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 0, kiwi.Strength.create(6, 1000000)))
+				// Strength.create(a, b, c) only reaches levels 1, 4 and 7,
+				// so the levels are chosen explicitly with SymbolicWeight.create.
+				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.SymbolicWeight.create(5)))
+				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 0, kiwi.SymbolicWeight.create(6, 1000000)))
 
 				solver.updateVariables()
 				assert.equal(x.value(), 100)

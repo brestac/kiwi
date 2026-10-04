@@ -2,6 +2,7 @@ import {Constraint, Operator} from './constraint.js'
 import {Expression} from './expression.js'
 import {createMap, IMap} from './maptype.js'
 import {Strength} from './strength.js'
+import {SymbolicWeight} from './symbolicweight.js'
 import {Variable} from './variable.js'
 
 /**
@@ -27,13 +28,13 @@ export class Solver {
 	 * @param {Expression|Variable} lhs Left hand side of the expression
 	 * @param {Operator} operator Operator
 	 * @param {Expression|Variable|Number} rhs Right hand side of the expression
-	 * @param {Number} [strength=Strength.required] Strength
+	 * @param {SymbolicWeight} [strength=Strength.required] Strength
 	 */
 	public createConstraint(
 		lhs: Expression | Variable,
 		operator: Operator,
 		rhs: Expression | Variable | number,
-		strength: number = Strength.required,
+		strength: SymbolicWeight = Strength.required,
 	): Constraint {
 		let cn = new Constraint(lhs, operator, rhs, strength)
 		this.addConstraint(cn)
@@ -158,15 +159,14 @@ export class Solver {
 	 * Add an edit variable to the solver.
 	 *
 	 * @param {Variable} variable Edit variable to add to the solver
-	 * @param {Number} strength Strength, should be less than `Strength.required`
+	 * @param {SymbolicWeight} strength Strength, should be less than `Strength.required`
 	 */
-	public addEditVariable(variable: Variable, strength: number): void {
+	public addEditVariable(variable: Variable, strength: SymbolicWeight): void {
 		let editPair = this._editMap.find(variable)
 		if (editPair !== undefined) {
 			throw new Error('duplicate edit variable')
 		}
-		strength = Strength.clip(strength)
-		if (strength === Strength.required) {
+		if (strength.equals(Strength.required)) {
 			throw new Error('bad required strength')
 		}
 		let expr = new Expression(variable)
@@ -328,7 +328,7 @@ export class Solver {
 				let slack = this._makeSymbol(SymbolType.Slack)
 				tag.marker = slack
 				row.insertSymbol(slack, coeff)
-				if (strength < Strength.required) {
+				if (strength.lessThan(Strength.required)) {
 					let error = this._makeSymbol(SymbolType.Error)
 					tag.other = error
 					row.insertSymbol(error, -coeff)
@@ -337,7 +337,7 @@ export class Solver {
 				break
 			}
 			case Operator.Eq: {
-				if (strength < Strength.required) {
+				if (strength.lessThan(Strength.required)) {
 					let errplus = this._makeSymbol(SymbolType.Error)
 					let errminus = this._makeSymbol(SymbolType.Error)
 					tag.marker = errplus
@@ -416,8 +416,12 @@ export class Solver {
 		this._artificial = row.copy()
 
 		// Optimize the artificial objective. This is successful
-		// only if the artificial objective is optimized to zero.
-		this._optimize(this._artificial)
+		// only if the artificial objective is optimized to zero. This
+		// objective is a plain sum of artificial-variable coefficients
+		// (see Row, below) — it has nothing to do with constraint
+		// strengths, so it stays plain-number, unlike the solver's real
+		// objective (see ObjectiveRow, below).
+		this._optimizeArtificial(this._artificial)
 		let success = nearZero(this._artificial.constant())
 		this._artificial = undefined
 
@@ -479,7 +483,7 @@ export class Solver {
 	 * @private
 	 */
 
-	private _optimize(objective: Row): void {
+	private _optimize(objective: ObjectiveRow): void {
 		let iterations = 0
 		while (iterations < this.maxIterations) {
 			let entering = this._getEnteringSymbol(objective)
@@ -493,7 +497,43 @@ export class Solver {
 			// pivot the entering symbol into the basis
 			let row = this._rowMap.erase(leaving)?.second
 			if (row == undefined) {
-				throw new Error('_optimize error')
+				throw new Error('failed to pivot the entering symbol into the basis')
+			}
+
+			row.solveForEx(leaving, entering)
+			this._substitute(entering, row)
+			this._rowMap.insert(entering, row)
+
+			iterations++
+		}
+		throw new Error('solver iterations exceeded')
+	}
+
+	/**
+	 * Optimize the plain-number artificial objective used while adding
+	 * a constraint via an artificial variable (see
+	 * `_addWithArtificialVariable`). Structurally identical to
+	 * `_optimize`, but kept separate because this objective's cells
+	 * are plain numbers, not SymbolicWeight — it tracks feasibility of
+	 * the artificial variable, not constraint strengths.
+	 *
+	 * @private
+	 */
+	private _optimizeArtificial(objective: Row): void {
+		let iterations = 0
+		while (iterations < this.maxIterations) {
+			let entering = this._getEnteringSymbolPlain(objective)
+			if (entering.type() === SymbolType.Invalid) {
+				return
+			}
+			let leaving = this._getLeavingSymbol(entering)
+			if (leaving.type() === SymbolType.Invalid) {
+				throw new Error('the objective is unbounded')
+			}
+			// pivot the entering symbol into the basis
+			let row = this._rowMap.erase(leaving)?.second
+			if (row == undefined) {
+				throw new Error('failed to pivot the entering symbol into the basis')
 			}
 			row.solveForEx(leaving, entering)
 			this._substitute(entering, row)
@@ -520,7 +560,7 @@ export class Solver {
 		while (infeasible.length !== 0) {
 			let leaving = infeasible.pop()
 			if (leaving == undefined) {
-				throw new Error('_dualOptimize failed')
+				throw new Error('dual optimize failed')
 			}
 			let pair = rows.find(leaving)
 			if (pair !== undefined && pair.second.constant() < 0.0) {
@@ -548,7 +588,25 @@ export class Solver {
 	 *
 	 * @private
 	 */
-	private _getEnteringSymbol(objective: Row): Symbol {
+	private _getEnteringSymbol(objective: ObjectiveRow): Symbol {
+		let cells = objective.cells()
+		for (let i = 0, n = cells.size(); i < n; ++i) {
+			let pair = cells.itemAt(i)
+			let symbol = pair.first
+			if (pair.second.isNegative() && symbol.type() !== SymbolType.Dummy) {
+				return symbol
+			}
+		}
+		return INVALID_SYMBOL
+	}
+
+	/**
+	 * Plain-number counterpart of `_getEnteringSymbol`, used only for
+	 * the artificial objective in `_optimizeArtificial`.
+	 *
+	 * @private
+	 */
+	private _getEnteringSymbolPlain(objective: Row): Symbol {
 		let cells = objective.cells()
 		for (let i = 0, n = cells.size(); i < n; ++i) {
 			let pair = cells.itemAt(i)
@@ -572,7 +630,7 @@ export class Solver {
 	 * @private
 	 */
 	private _getDualEnteringSymbol(row: Row): Symbol {
-		let ratio = Number.MAX_VALUE
+		let ratio = SymbolicWeight.infinity
 		let entering = INVALID_SYMBOL
 		let cells = row.cells()
 		for (let i = 0, n = cells.size(); i < n; ++i) {
@@ -581,8 +639,8 @@ export class Solver {
 			let c = pair.second
 			if (c > 0.0 && symbol.type() !== SymbolType.Dummy) {
 				let coeff = this._objective.coefficientFor(symbol)
-				let r = coeff / c
-				if (r < ratio) {
+				let r = coeff.divide(c)
+				if (r.lessThan(ratio)) {
 					ratio = r
 					entering = symbol
 				}
@@ -705,12 +763,12 @@ export class Solver {
 	 *
 	 * @private
 	 */
-	private _removeMarkerEffects(marker: Symbol, strength: number): void {
+	private _removeMarkerEffects(marker: Symbol, strength: SymbolicWeight): void {
 		let pair = this._rowMap.find(marker)
 		if (pair !== undefined) {
-			this._objective.insertRow(pair.second, -strength)
+			this._objective.insertRow(pair.second, strength.negate())
 		} else {
-			this._objective.insertSymbol(marker, -strength)
+			this._objective.insertSymbol(marker, strength.negate())
 		}
 	}
 
@@ -747,7 +805,7 @@ export class Solver {
 	private _varMap = createVarMap()
 	private _editMap = createEditMap()
 	private _infeasibleRows: Symbol[] = []
-	private _objective: Row = new Row()
+	private _objective: ObjectiveRow = new ObjectiveRow()
 	private _artificial: Row | undefined = undefined
 	private _idTick: number = 0
 }
@@ -1001,7 +1059,7 @@ class Row {
 		let cells = this._cellMap
 		let pair = cells.erase(symbol)
 		if (pair == undefined) {
-			throw new Error('solveFor failed')
+			throw new Error("solveFor error")
 		}
 		let coeff = -1.0 / pair.second
 		this._constant *= coeff
@@ -1053,4 +1111,97 @@ class Row {
 
 	private _cellMap = createMap<Symbol, number>()
 	private _constant: number
+}
+
+/**
+ * A row class specialized for the solver's real objective function.
+ *
+ * Structurally this mirrors Row, but its cell values (and constant)
+ * are SymbolicWeight instead of plain numbers, and it only
+ * implements the operations the solver actually needs on the
+ * objective. A constraint row (Row) is always what gets pivoted
+ * *into* the objective — never the reverse, and the objective is
+ * never pivoted into anything else — so `insertRow`/`substitute`
+ * always take a plain-number Row as their structural argument, while
+ * the coefficient that row's contribution gets scaled by is the
+ * objective's own SymbolicWeight for the eliminated symbol.
+ * @private
+ */
+class ObjectiveRow {
+	/**
+	 * Returns the mapping of symbols to symbolic weights.
+	 */
+	public cells(): IMap<Symbol, SymbolicWeight> {
+		return this._cellMap
+	}
+
+	/**
+	 * Returns the constant for the row (the current total weighted
+	 * error). Maintained for completeness; the solver never reads it.
+	 */
+	public constant(): SymbolicWeight {
+		return this._constant
+	}
+
+	/**
+	 * Insert the symbol into the row with the given weight.
+	 *
+	 * If the symbol already exists in the row, the weight will be
+	 * added to the existing weight. If the resulting weight is
+	 * (approximately) zero at every level, the symbol will be removed
+	 * from the row.
+	 */
+	public insertSymbol(symbol: Symbol, weight: SymbolicWeight): void {
+		let pair = this._cellMap.setDefault(symbol, () => SymbolicWeight.zero)
+		let sum = pair.second.plus(weight)
+		if (sum.nearZero()) {
+			this._cellMap.erase(symbol)
+		} else {
+			pair.second = sum
+		}
+	}
+
+	/**
+	 * Insert a structural (plain-number) row into this row, scaling
+	 * its constant and cells by the given symbolic weight coefficient.
+	 */
+	public insertRow(other: Row, coefficient: SymbolicWeight): void {
+		this._constant = this._constant.plus(coefficient.multiply(other.constant()))
+		let cells = other.cells()
+		for (let i = 0, n = cells.size(); i < n; ++i) {
+			let pair = cells.itemAt(i)
+			this.insertSymbol(pair.first, coefficient.multiply(pair.second))
+		}
+	}
+
+	/**
+	 * Remove a symbol from the row.
+	 */
+	public removeSymbol(symbol: Symbol): void {
+		this._cellMap.erase(symbol)
+	}
+
+	/**
+	 * Returns the symbolic weight for the given symbol, or the zero
+	 * weight if the symbol isn't present.
+	 */
+	public coefficientFor(symbol: Symbol): SymbolicWeight {
+		let pair = this._cellMap.find(symbol)
+		return pair !== undefined ? pair.second : SymbolicWeight.zero
+	}
+
+	/**
+	 * Substitute a symbol with the data from a structural row.
+	 *
+	 * If the symbol does not exist in the row, this is a no-op.
+	 */
+	public substitute(symbol: Symbol, row: Row): void {
+		let pair = this._cellMap.erase(symbol)
+		if (pair !== undefined) {
+			this.insertRow(row, pair.second)
+		}
+	}
+
+	private _cellMap = createMap<Symbol, SymbolicWeight>()
+	private _constant: SymbolicWeight = SymbolicWeight.zero
 }

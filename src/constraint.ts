@@ -1,5 +1,6 @@
 import {Expression} from './expression.js'
 import {Strength} from './strength.js'
+import {SymbolicWeight} from './symbolicweight.js'
 import {Variable} from './variable.js'
 
 /**
@@ -29,17 +30,17 @@ export enum Operator {
  * @param {Expression} expression The constraint expression (LHS).
  * @param {Operator} operator The equation operator.
  * @param {Expression} [rhs] Right hand side of the expression.
- * @param {Number} [strength=Strength.required] The strength of the constraint.
+ * @param {SymbolicWeight} [strength=Strength.required] The strength of the constraint.
  */
 export class Constraint {
 	constructor(
 		expression: Expression | Variable,
 		operator: Operator,
 		rhs?: Expression | Variable | number,
-		strength: number = Strength.required,
+		strength: SymbolicWeight = Strength.required,
 	) {
 		this._operator = operator
-		this._strength = Strength.clip(strength)
+		this._strength = strength
 
 		if (expression instanceof Variable) {
 			expression = new Expression(expression)
@@ -81,9 +82,9 @@ export class Constraint {
 	/**
 	 * Returns the strength of the constraint.
 	 *
-	 * @return {Number} strength
+	 * @return {SymbolicWeight} strength
 	 */
-	public strength(): number {
+	public strength(): SymbolicWeight {
 		return this._strength
 	}
 
@@ -95,7 +96,7 @@ export class Constraint {
 
 	private _expression: Expression
 	private _operator: Operator
-	private _strength: number
+	private _strength: SymbolicWeight
 	private _id: number = CnId++
 }
 
