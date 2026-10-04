@@ -1,15 +1,20 @@
-import {Constraint, Operator} from './constraint.js'
-import {Expression} from './expression.js'
-import {createMap, IMap} from './maptype.js'
-import {Strength} from './strength.js'
-import {SymbolicWeight} from './symbolicweight.js'
-import {Variable} from './variable.js'
-
+import { Constraint, Operator } from './constraint.js'
+import { Expression } from './expression.js'
+import { createMap, createFlatValuesMap, FlatValuesMap, IMap } from './maptype.js'
+import { Strength } from './strength.js'
+import { SymbolicWeight } from './symbolicweight.js'
+import { Variable } from './variable.js'
+import { SolverInterface } from './solverinterface.js'
 /**
  * The constraint solver class.
  *
  * @class
  */
+ export interface SolverOptions {
+  worker?: boolean,
+  floatPrecision?: number
+}
+
 export class Solver {
 	/**
 	 * @type {number} - The max number of solver iterations before an error
@@ -17,10 +22,24 @@ export class Solver {
 	 */
 	public maxIterations = 1000
 
-	/**
-	 * Construct a new Solver.
-	 */
-	constructor() {}
+	static create(options: SolverOptions = {}): Solver | SolverInterface {
+    if (options?.worker == true) {
+      if (!globalThis.crossOriginIsolated) {
+        throw new Error('Option worker=true. The client is not crossOriginIsolated.\nYou may need to add the following headers to your server:\nCross-Origin-Opener-Policy=same-origin\nCross-Origin-Embedder-Policy=require-corp')
+      }
+      return new SolverInterface()
+    } else {
+      return new Solver()
+    }
+	}
+
+  constructor(sharedValues?: Int32Array) {
+    if (sharedValues !== undefined) {
+      this._varMap = createSharedVarMap(sharedValues)
+    } else {
+      this._varMap = createVarMap()
+    }
+  }
 
 	/**
 	 * Creates and add a constraint to the solver.
@@ -125,7 +144,7 @@ export class Solver {
 			}
 			rowPair = this._rowMap.erase(leaving)
 			if (rowPair == undefined) {
-					throw new Error('failed to erase leaving row')
+				throw new Error('failed to erase leaving row')
 			}
 			rowPair.second.solveForEx(leaving, marker)
 			this._substitute(marker, rowPair.second)
@@ -234,6 +253,21 @@ export class Solver {
 		this._dualOptimize()
 	}
 
+  public getVariable(id: number): Variable | undefined {
+    const i = this._varMap.index[id]
+    if (i === undefined) return undefined
+
+    return this._varMap.array[i]?.first
+  }
+
+  public valueOfVariable(variable: Variable): bigint | number | undefined {
+    if (this._varMap instanceof FlatValuesMap) {
+      return this._varMap.findValue(variable)
+    }
+
+    return variable.value()
+  }
+
 	/**
 	 * Return the fixed sign of the marker symbol's coefficient as it
 	 * was inserted into the constraint's row at creation time.
@@ -266,7 +300,7 @@ export class Solver {
 	 * @return {Constraint[]}
 	 */
 	public getConstraints(): Constraint[] {
-		return this._cnMap.array.map(({first}) => first)
+		return this._cnMap.array.map(({ first }) => first)
 	}
 
 	/**
@@ -288,7 +322,7 @@ export class Solver {
 		this.addConstraint(cn)
 		let pair = this._cnMap.find(cn)
 		if (pair !== undefined) {
-			let info = {tag: pair.second, constraint: cn, constant: 0.0}
+			let info = { tag: pair.second, constraint: cn, constant: 0.0 }
 			this._editMap.insert(variable, info)
 		}
 	}
@@ -373,14 +407,25 @@ export class Solver {
 	public updateVariables(): void {
 		let vars = this._varMap
 		let rows = this._rowMap
+    const sharedValues = vars instanceof FlatValuesMap
+
 		for (let i = 0, n = vars.size(); i < n; ++i) {
-			let pair = vars.itemAt(i)
-			let rowPair = rows.find(pair.second)
-			if (rowPair !== undefined) {
-				pair.first.setValue(rowPair.second.constant())
-			} else {
-				pair.first.setValue(0.0)
-			}
+			let { first: variable, second: symbol } = vars.itemAt(i)
+			let rowPair = rows.find(symbol)
+
+      if (sharedValues) {        
+        if (rowPair !== undefined) {
+  				vars.insertValueAt(rowPair.second.constant(), variable._sharedOutputIndex, variable._notify)
+  			} else {
+          vars.insertValueAt(0, variable._sharedOutputIndex, variable._notify)
+  			}
+      } else {
+        if (rowPair !== undefined) {
+  				variable.setValue(rowPair.second.constant())
+  			} else {
+          variable.setValue(0.0)
+  			}
+      }
 		}
 	}
 
@@ -434,7 +479,7 @@ export class Solver {
 		// Add the necessary slack, error, and dummy variables.
 		let objective = this._objective
 		let strength = constraint.strength()
-		let tag = {marker: INVALID_SYMBOL, other: INVALID_SYMBOL}
+		let tag = { marker: INVALID_SYMBOL, other: INVALID_SYMBOL }
 		switch (constraint.op()) {
 			case Operator.Le:
 			case Operator.Ge: {
@@ -474,7 +519,7 @@ export class Solver {
 			row.reverseSign()
 		}
 
-		return {row, tag}
+		return { row, tag }
 	}
 
 	/**
@@ -612,8 +657,8 @@ export class Solver {
 				throw new Error('the objective is unbounded')
 			}
 			// pivot the entering symbol into the basis
-			let row = this._rowMap.erase(leaving)?.second
-			if (row == undefined) {
+			let row = this._rowMap.erase(leaving) ?.second
+      if (row == undefined) {
 				throw new Error('failed to pivot the entering symbol into the basis')
 			}
 
@@ -648,8 +693,8 @@ export class Solver {
 				throw new Error('the objective is unbounded')
 			}
 			// pivot the entering symbol into the basis
-			let row = this._rowMap.erase(leaving)?.second
-			if (row == undefined) {
+			let row = this._rowMap.erase(leaving) ?.second
+      if (row == undefined) {
 				throw new Error('failed to pivot the entering symbol into the basis')
 			}
 			row.solveForEx(leaving, entering)
@@ -919,7 +964,7 @@ export class Solver {
 
 	private _cnMap = createCnMap()
 	private _rowMap = createRowMap()
-	private _varMap = createVarMap()
+	private _varMap: IMap<Variable, Symbol> | FlatValuesMap<Variable, Symbol>
 	private _editMap = createEditMap()
 	private _infeasibleRows: Symbol[] = []
 	private _objective: ObjectiveRow = new ObjectiveRow()
@@ -983,6 +1028,10 @@ function createRowMap(): IMap<Symbol, Row> {
  */
 function createVarMap(): IMap<Variable, Symbol> {
 	return createMap<Variable, Symbol>()
+}
+
+function createSharedVarMap(values: Int32Array): FlatValuesMap<Variable, Symbol> {
+	return createFlatValuesMap(values)
 }
 
 /**

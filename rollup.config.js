@@ -1,3 +1,7 @@
+import { defineConfig } from 'rollup';
+import typescript from 'rollup-plugin-typescript2';
+import webWorkerLoader from 'rollup-plugin-web-worker-loader';
+
 const license = /*js*/ `
 /*-----------------------------------------------------------------------------
 | Copyright (c) 2014-2019, Nucleic Development Team & H. Rutjes & Lume.
@@ -8,8 +12,9 @@ const license = /*js*/ `
 -----------------------------------------------------------------------------*/
 `,
 	banner =
-		license +
-		/*js*/ `
+	license +
+	/*js*/
+	`
 /**
  * Lume Kiwi is an efficient implementation of the Cassowary constraint solving
  * algorithm, based on the seminal Cassowary paper.
@@ -53,18 +58,40 @@ const license = /*js*/ `
  * @module @lume/kiwi
  */
 `
+
+export default defineConfig({
+	input: './src/kiwi.ts',
+	output: {
+		file: './dist/kiwi.js',
+		format: 'esm',
+		sourcemap: true,
+	},
+	plugins: [
+    // 1. On intercepte les imports de workers pour les compiler en inline
+    webWorkerLoader({
+			targetPlatform: 'browser',
+			extensions: ['.ts', '.js'],
+			inline: true, // Force l'inlining via Blob URL
+			sourcemap: false,
+		}),
+    // 2. On compile le reste du TypeScript
+    typescript(),
+  ],
+});
+/*
 // we generate three output formats:
 // - a fully ES6 version in tmp/kiwi.js, used just as the input to jsdoc2md.
 
 const doc = {
-	input: 'dist/kiwi.js',
-	output: {
-		name: 'kiwi',
-		exports: 'named',
-		banner,
-		file: 'tmp/kiwi.js',
-		format: 'es',
-	},
+  input: 'dist/kiwi.js',
+  output: {
+    name: 'kiwi',
+    exports: 'named',
+    banner,
+    file: 'tmp/kiwi.js',
+    format: 'es',
+  },
 }
 
 export default [doc]
+*/

@@ -170,7 +170,7 @@ async function main() {
 		}
 	}
 
-	function createKiwiSolverNewAPI() {
+	function _createKiwiSolverNewAPI(updateConstantTo) {
 		var solver = new kiwi.Solver()
 		var strength = kiwi.Strength.create(0, 900, 1000)
 
@@ -187,10 +187,24 @@ async function main() {
 		solver.createConstraint(superView.top, kiwi.Operator.Eq, 0)
 		solver.createConstraint(superView.right, kiwi.Operator.Eq, superView.left.plus(superView.width))
 		solver.createConstraint(superView.bottom, kiwi.Operator.Eq, superView.top.plus(superView.height))
-		solver.addEditVariable(superView.width, kiwi.Strength.create(999, 1000, 1000))
-		solver.addEditVariable(superView.height, kiwi.Strength.create(999, 1000, 1000))
-		solver.suggestValue(superView.width, 300)
-		solver.suggestValue(superView.height, 200)
+
+		let widthConstraint, heightConstraint
+
+		if (updateConstantTo) {
+			widthConstraint = new kiwi.Constraint(
+				superView.width, kiwi.Operator.Eq, 300
+			)
+			heightConstraint = new kiwi.Constraint(
+				superView.height, kiwi.Operator.Eq, 200
+			)
+			solver.addConstraint(widthConstraint)
+			solver.addConstraint(heightConstraint)
+		} else {
+			solver.addEditVariable(superView.width, kiwi.Strength.create(999, 1000, 1000))
+			solver.addEditVariable(superView.height, kiwi.Strength.create(999, 1000, 1000))
+			solver.suggestValue(superView.width, 300)
+			solver.suggestValue(superView.height, 200)
+		}
 
 		// subView1
 		var subView1 = {
@@ -230,11 +244,11 @@ async function main() {
 		solver.updateVariables()
 
 		// Uncomment to verify results
-		//console.log('superView: ' + JSON.stringify(superView, undefined, 2));
-		//console.log('subView1: ' + JSON.stringify(subView1, undefined, 2));
-		//console.log('subView2: ' + JSON.stringify(subView2, undefined, 2));
-		assert.equal(subView1.width.value(), 150)
-		assert.equal(subView2.left.value(), 150)
+		// console.log('superView: ' + JSON.stringify(superView, undefined, 2));
+		// console.log('subView1: ' + JSON.stringify(subView1, undefined, 2));
+		// console.log('subView2: ' + JSON.stringify(subView2, undefined, 2));
+		assert.equal(solver.valueOfVariable(subView1.width), 150)
+		assert.equal(solver.valueOfVariable(subView2.left), 150)
 
 		// Return data
 		return {
@@ -242,9 +256,160 @@ async function main() {
 			superView: superView,
 			subView1: subView1,
 			subView2: subView2,
+			widthConstraint,
+			heightConstraint
 		}
 	}
 
+	function createKiwiSolverNewAPI() {
+		return _createKiwiSolverNewAPI(false)
+	}
+
+	function createKiwiSolverWorker() {
+		var solver = kiwi.Solver.create({worker: true})
+		var strength = kiwi.Strength.create(0, 900, 1000)
+
+		// super-view
+		var superView = {
+			left: new kiwi.Variable(),
+			top: new kiwi.Variable(),
+			width: new kiwi.Variable(),
+			height: new kiwi.Variable(),
+			right: new kiwi.Variable(),
+			bottom: new kiwi.Variable(),
+		}
+		solver.createConstraint(superView.left, kiwi.Operator.Eq, 0)
+		solver.createConstraint(superView.top, kiwi.Operator.Eq, 0)
+		solver.createConstraint(superView.right, kiwi.Operator.Eq, superView.left.plus(superView.width))
+		solver.createConstraint(superView.bottom, kiwi.Operator.Eq, superView.top.plus(superView.height))
+
+		const widthConstraint = new kiwi.Constraint(
+			superView.width, kiwi.Operator.Eq, 300
+		)
+		const heightConstraint = new kiwi.Constraint(
+			superView.height, kiwi.Operator.Eq, 200
+		)
+		solver.addConstraint(widthConstraint)
+		solver.addConstraint(heightConstraint)
+
+		// subView1
+		var subView1 = {
+			left: new kiwi.Variable(),
+			top: new kiwi.Variable(),
+			width: new kiwi.Variable(),
+			height: new kiwi.Variable(),
+			right: new kiwi.Variable(),
+			bottom: new kiwi.Variable(),
+		}
+		solver.createConstraint(subView1.right, kiwi.Operator.Eq, subView1.left.plus(subView1.width))
+		solver.createConstraint(subView1.bottom, kiwi.Operator.Eq, subView1.top.plus(subView1.height))
+
+		// subView2
+		var subView2 = {
+			left: new kiwi.Variable(),
+			top: new kiwi.Variable(),
+			width: new kiwi.Variable(),
+			height: new kiwi.Variable(),
+			right: new kiwi.Variable(),
+			bottom: new kiwi.Variable(),
+		}
+		solver.createConstraint(subView2.right, kiwi.Operator.Eq, subView2.left.plus(subView2.width))
+		solver.createConstraint(subView2.bottom, kiwi.Operator.Eq, subView2.top.plus(subView2.height))
+
+		// Position sub-views in super-view
+		solver.createConstraint(subView1.left, kiwi.Operator.Eq, superView.left, strength)
+		solver.createConstraint(subView1.top, kiwi.Operator.Eq, superView.top, strength)
+		solver.createConstraint(subView1.bottom, kiwi.Operator.Eq, superView.bottom, strength)
+		solver.createConstraint(subView1.width, kiwi.Operator.Eq, subView2.width, strength)
+		solver.createConstraint(subView1.right, kiwi.Operator.Eq, subView2.left, strength)
+		solver.createConstraint(subView2.right, kiwi.Operator.Eq, superView.right, strength)
+		solver.createConstraint(subView2.top, kiwi.Operator.Eq, superView.top, strength)
+		solver.createConstraint(subView2.bottom, kiwi.Operator.Eq, superView.bottom, strength)
+
+		// Calculate
+		solver.updateVariables()
+
+		// Uncomment to verify results
+		// console.log('superView: ' + JSON.stringify(superView, undefined, 2));
+		// console.log('subView1: ' + JSON.stringify(subView1, undefined, 2));
+		// console.log('subView2: ' + JSON.stringify(subView2, undefined, 2));
+		// assert.equal(solver.valueOfVariable(subView1.width), 150)
+		// assert.equal(solver.valueOfVariable(subView2.left), 150)
+
+		// Return data
+		return {
+			solver: solver,
+			superView: superView,
+			subView1: subView1,
+			subView2: subView2,
+			widthConstraint,
+			heightConstraint
+		}
+	}
+/*
+	function createKiwiSolver4VariablesPerElement() {
+		var solver = new kiwi.Solver()
+
+		// super-view
+		var superView = {
+			left: new kiwi.Variable(),
+			top: new kiwi.Variable(),
+			width: new kiwi.Variable(),
+			height: new kiwi.Variable()
+		}
+		solver.createConstraint(superView.left, kiwi.Operator.Eq, 0)
+		solver.createConstraint(superView.top, kiwi.Operator.Eq, 0)
+		const widthConstraint = new kiwi.Constraint(
+			superView.width, kiwi.Operator.Eq, 300
+		)
+		const heightConstraint = new kiwi.Constraint(
+			superView.height, kiwi.Operator.Eq, 200
+		)
+		solver.addConstraint(widthConstraint)
+		solver.addConstraint(heightConstraint)
+
+		// subView1
+		var subView1 = {
+			left: new kiwi.Variable(),
+			top: new kiwi.Variable(),
+			width: new kiwi.Variable(),
+			height: new kiwi.Variable(),
+		}
+		solver.createConstraint(subView1.left, kiwi.Operator.Eq, 0)
+		solver.createConstraint(subView1.top, kiwi.Operator.Eq, 0)
+		solver.createConstraint(subView1.width, kiwi.Operator.Eq, superView.width.divide(2))
+		solver.createConstraint(subView1.height, kiwi.Operator.Eq, superView.height.divide(2))
+
+		// subView2
+		var subView2 = {
+			left: new kiwi.Variable(),
+			top: new kiwi.Variable(),
+			width: new kiwi.Variable(),
+			height: new kiwi.Variable()
+		}
+		solver.createConstraint(subView2.left, kiwi.Operator.Eq, superView.width.divide(2))
+		solver.createConstraint(subView2.top, kiwi.Operator.Eq, superView.height.divide(2))
+		solver.createConstraint(subView2.width, kiwi.Operator.Eq, superView.width.divide(2))
+		solver.createConstraint(subView2.height, kiwi.Operator.Eq, superView.height.divide(2))
+
+		// Calculate
+		solver.updateVariables()
+
+		// Uncomment to verify results
+		// console.log('superView: ' + JSON.stringify(superView, undefined, 2));
+		// console.log('subView1: ' + JSON.stringify(subView1, undefined, 2));
+		// console.log('subView2: ' + JSON.stringify(subView2, undefined, 2));
+		assert.equal(solver.valueOfVariable(subView1.width), 150)
+		assert.equal(solver.valueOfVariable(subView2.left), 150)
+
+		// Return data
+		return {
+			solver,
+			widthConstraint,
+			heightConstraint
+		}
+	}
+*/
 	function createCassowarySolver() {
 		var solver = new c.SimplexSolver()
 		var strength = new c.Strength('priority', 0, 900, 1000)
@@ -338,6 +503,28 @@ async function main() {
 		data.solver.updateVariables()
 	}
 
+	var kiwiData2 = _createKiwiSolverNewAPI(true)
+	function solveKiwi2(data) {
+		var data = kiwiData2
+		data.solver.updateConstantTo(data.widthConstraint, 100)
+		data.solver.updateConstantTo(data.heightConstraint, 50)
+		data.solver.updateVariables()
+		data.solver.updateConstantTo(data.widthConstraint, 200)
+		data.solver.updateConstantTo(data.heightConstraint, 500)
+		data.solver.updateVariables()
+	}
+
+	var kiwiData3 = createKiwiSolverWorker()
+	function solveKiwiWorker(data) {
+		var data = kiwiData3
+		data.solver.updateConstantTo(data.widthConstraint, 100)
+		data.solver.updateConstantTo(data.heightConstraint, 50)
+		data.solver.updateVariables()
+		data.solver.updateConstantTo(data.widthConstraint, 200)
+		data.solver.updateConstantTo(data.heightConstraint, 500)
+		data.solver.updateVariables()
+	}
+
 	function runBench(name, benchmarks, callback) {
 		log('----- Running ' + name + ' benchmark...')
 		var suite = new Benchmark.Suite()
@@ -367,7 +554,9 @@ async function main() {
 		function () {
 			runBench('solving', [
 				{name: 'Cassowary.js', fn: solveCassowary},
-				{name: 'kiwi', fn: solveKiwi},
+				{name: 'kiwi suggestValue', fn: solveKiwi},
+				{name: 'kiwi updateConstantTo', fn: solveKiwi2},
+				{name: 'kiwi updateConstantTo with web worker', fn: solveKiwiWorker},
 			])
 		},
 	)
