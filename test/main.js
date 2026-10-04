@@ -354,5 +354,178 @@ describe('import kiwi', function () {
 					assert.equal(x.value(), 100)
 				})
 			})
-	})
+
+			describe('Update Constraint constant', function () {
+				it('left == 10 >> left == 20 >> left == 10', function () {
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					let constraint = new kiwi.Constraint(left, kiwi.Operator.Eq, 10)
+					solver.addConstraint(constraint)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 10)
+
+					solver.updateConstantTo(constraint, 20)
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+
+					solver.updateConstantTo(constraint, 10)
+					solver.updateVariables()
+					assert.equal(left.value(), 10)
+				})
+
+				it('left >= 10 >> left => 20 >> left => 10', function () {
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					let constraintEq = new kiwi.Constraint(left, kiwi.Operator.Eq, 0, kiwi.Strength.strong)
+					let constraintGe = new kiwi.Constraint(left, kiwi.Operator.Ge, 10, kiwi.Strength.required)
+					solver.addConstraint(constraintEq)
+					solver.addConstraint(constraintGe)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 10)
+
+					solver.updateConstantTo(constraintGe, 20)
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+
+					solver.updateConstantTo(constraintGe, 10)
+					solver.updateVariables()
+					assert.equal(left.value(), 10)
+				})
+
+				it('left <= 20 >> left <= 30 >> left <= 20', function () {
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					let constraintEq = new kiwi.Constraint(left, kiwi.Operator.Eq, 50, kiwi.Strength.strong)
+					let constraintLe = new kiwi.Constraint(left, kiwi.Operator.Le, 20, kiwi.Strength.required)
+					solver.addConstraint(constraintEq)
+					solver.addConstraint(constraintLe)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+
+					solver.updateConstantTo(constraintLe, 30)
+					solver.updateVariables()
+					assert.equal(left.value(), 30)
+
+					solver.updateConstantTo(constraintLe, 20)
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+				})
+
+				it('left == 20 && right == left + 10 >> right == left + 20', function () {
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					var right = new kiwi.Variable()
+					let constraintLeft = new kiwi.Constraint(left, kiwi.Operator.Eq, 20, kiwi.Strength.strong)
+					let constraintRight = new kiwi.Constraint(right, kiwi.Operator.Eq, new kiwi.Expression(left).plus(10), kiwi.Strength.required)
+					solver.addConstraint(constraintLeft)
+					solver.addConstraint(constraintRight)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+					assert.equal(right.value(), 30)
+
+					solver.updateConstantTo(constraintRight, 20)
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+					assert.equal(right.value(), 40)
+
+				})
+
+				it('left == 10 && right == left + 10 >> right == left + 20', function () {
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					var right = new kiwi.Variable()
+					let constraintLeft = new kiwi.Constraint(left, kiwi.Operator.Eq, 10, kiwi.Strength.strong)
+					let constraintRight = new kiwi.Constraint(right, kiwi.Operator.Eq, new kiwi.Expression(left).plus(10), kiwi.Strength.required)
+					solver.addConstraint(constraintLeft)
+					solver.addConstraint(constraintRight)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 10)
+					assert.equal(right.value(), 20)
+
+					solver.updateConstantTo(constraintRight, 20)
+					solver.updateVariables()
+					assert.equal(left.value(), 10)
+					assert.equal(right.value(), 30)
+				})
+
+				it('right == 30 && left == right - 10 >> left == right - 20', function () {
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					var right = new kiwi.Variable()
+					let constraintRight = new kiwi.Constraint(right, kiwi.Operator.Eq, 30, kiwi.Strength.strong)
+					let constraintLeft = new kiwi.Constraint(left, kiwi.Operator.Eq, new kiwi.Expression(right).minus(10), kiwi.Strength.required)
+					solver.addConstraint(constraintLeft)
+					solver.addConstraint(constraintRight)
+
+					solver.updateVariables()
+					assert.equal(right.value(), 30)
+					assert.equal(left.value(), 20)
+
+					solver.updateConstantTo(constraintLeft, -20)
+					solver.updateVariables()
+					assert.equal(right.value(), 30)
+					assert.equal(left.value(), 10)
+
+				})
+
+				it('marker itself basic: left >= 10 && left >= 20 (required, redundant bound)', function () {
+					// Adding `left >= 20` after `left >= 10` forces the solver
+					// down the artificial-variable path (no External symbol
+					// left in the row after substitution), which leaves the
+					// FIRST constraint's own marker (its slack) basic in the
+					// tableau. Updating that constraint's constant must hit
+					// the "marker itself is basic" branch.
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					let constraintGe10 = new kiwi.Constraint(left, kiwi.Operator.Ge, 10, kiwi.Strength.required)
+					let constraintGe20 = new kiwi.Constraint(left, kiwi.Operator.Ge, 20, kiwi.Strength.required)
+					solver.addConstraint(constraintGe10)
+					solver.addConstraint(constraintGe20)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+
+					solver.updateConstantTo(constraintGe10, 25)
+					solver.updateVariables()
+					assert.equal(left.value(), 25)
+
+					solver.updateConstantTo(constraintGe10, 10)
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+				})
+
+				it('other (paired error) basic: weak left == 10 && required left <= 5', function () {
+					// A weak equality whose target lies above a required
+					// upper bound is forced below its target, so its
+					// negative-deviation error variable ("other") ends up
+					// basic while its own marker stays non-basic. Updating
+					// the weak constraint's constant must hit the "other is
+					// basic" branch, and must NOT move `left` while the
+					// required bound still dominates.
+					var solver = new kiwi.Solver()
+					var left = new kiwi.Variable()
+					let constraintWeak = new kiwi.Constraint(left, kiwi.Operator.Eq, 10, kiwi.Strength.weak)
+					let constraintLe = new kiwi.Constraint(left, kiwi.Operator.Le, 5, kiwi.Strength.required)
+					solver.addConstraint(constraintWeak)
+					solver.addConstraint(constraintLe)
+
+					solver.updateVariables()
+					assert.equal(left.value(), 5)
+
+					solver.updateConstantTo(constraintWeak, 20)
+					solver.updateVariables()
+					assert.equal(left.value(), 5)
+
+					// Relaxing the required bound lets the weak target win.
+					solver.updateConstantTo(constraintLe, 25)
+					solver.updateVariables()
+					assert.equal(left.value(), 20)
+				})
+			})
+		})
 })

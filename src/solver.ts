@@ -135,7 +135,119 @@ export class Solver {
 		// solver remains consistent. It makes the solver api easier to
 		// use at a small tradeoff for speed.
 		if (shouldOptimize) this._optimize(this._objective)
+	}
+
+	/**
+	 * Update the strength of a non-required constraint already present
+	 * in the solver, without removing and re-adding it.
+	 *
+	 * Both the constraint's current strength and the new strength must
+	 * be different from `Strength.required`.
+	 *
+	 * @param {Constraint} constraint Constraint whose strength should change
+	 * @param {SymbolicWeight} strength The new strength for the constraint
+	 */
+	public updateStrengthTo(constraint: Constraint, strength: SymbolicWeight): void {
+		let cnPair = this._cnMap.find(constraint)
+		if (cnPair === undefined) {
+			throw new Error('unknown constraint')
+		}
+
+		let oldStrength = constraint.strength()
+
+		if (oldStrength.equals(Strength.required) || strength.equals(Strength.required)) {
+			throw new Error('cannot update strength to or from required')
+		}
+
+		if (strength.equals(oldStrength)) {
+			return
+		}
+
+		let tag = cnPair.second
+		let delta = oldStrength.minus(strength)
+
+		if (tag.marker.type() === SymbolType.Error) {
+			this._removeMarkerEffects(tag.marker, delta)
+		}
+		if (tag.other.type() === SymbolType.Error) {
+			this._removeMarkerEffects(tag.other, delta)
+		}
+
+		constraint.setStrength(strength)
+
 		this._optimize(this._objective)
+	}
+
+	/**
+	 * Update the constant of a constraint already present in the solver,
+	 * without removing and re-adding it.
+	 *
+	 * @param {Constraint} constraint Constraint whose constant should change
+	 * @param {Number} constant The new constant for the constraint's expression
+	 */
+	public updateConstantTo(constraint: Constraint, constant: number): void {
+		let cnPair = this._cnMap.find(constraint)
+		if (cnPair === undefined) {
+			throw new Error('unknown constraint')
+		}
+
+		let newExprConstant = -constant
+		let oldExprConstant = constraint.expression().constant()
+		if (newExprConstant === oldExprConstant) {
+			return
+		}
+		let delta = newExprConstant - oldExprConstant
+		constraint.setConstant(newExprConstant)
+
+		let tag = cnPair.second
+		let markerCoeff = this._markerCoefficient(constraint.op(), tag.marker)
+		let rows = this._rowMap
+
+		let rowPair = rows.find(tag.marker)
+		if (rowPair !== undefined) {
+			if (rowPair.second.add(-delta * markerCoeff) < 0.0) {
+				this._infeasibleRows.push(tag.marker)
+			}
+			this._dualOptimize()
+			return
+		}
+
+		if (tag.other.type() !== SymbolType.Invalid) {
+			rowPair = rows.find(tag.other)
+			if (rowPair !== undefined) {
+				if (rowPair.second.add(delta * markerCoeff) < 0.0) {
+					this._infeasibleRows.push(tag.other)
+				}
+				this._dualOptimize()
+				return
+			}
+		}
+
+		for (let i = 0, n = rows.size(); i < n; ++i) {
+			let rowPair2 = rows.itemAt(i)
+			let row = rowPair2.second
+			let paramCoeff = row.coefficientFor(tag.marker)
+			if (paramCoeff !== 0.0 && row.add(delta * paramCoeff * markerCoeff) < 0.0 && rowPair2.first.type() !== SymbolType.External) {
+				this._infeasibleRows.push(rowPair2.first)
+			}
+		}
+		this._dualOptimize()
+	}
+
+	/**
+	 * Return the fixed sign of the marker symbol's coefficient as it
+	 * was inserted into the constraint's row at creation time.
+	 * @private
+	 */
+	private _markerCoefficient(op: Operator, marker: Symbol): number {
+		switch (op) {
+			case Operator.Le:
+				return 1.0
+			case Operator.Ge:
+				return -1.0
+			default:
+				return marker.type() === SymbolType.Dummy ? 1.0 : -1.0
+		}
 	}
 
 	/**

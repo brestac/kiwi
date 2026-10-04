@@ -43,6 +43,17 @@ export class Expression {
 	}
 
 	/**
+	 * Set the constant of the expression.
+	 *
+	 * Intended to be called only via Constraint#setConstant when the
+	 * Solver incrementally updates a constraint's constant.
+	 * @private
+	 */
+	public setConstant(constant: number): void {
+		this._constant = constant
+	}
+
+	/**
 	 * Returns the computed value of the expression.
 	 *
 	 * @private
