@@ -515,21 +515,52 @@ async function main() {
 	}
 
 	var kiwiData3 = createKiwiSolverWorker()
-	function solveKiwiWorker(data) {
-		var data = kiwiData3
-		data.solver.updateConstantTo(data.widthConstraint, 100)
-		data.solver.updateConstantTo(data.heightConstraint, 50)
-		data.solver.updateVariables()
-		data.solver.updateConstantTo(data.widthConstraint, 200)
-		data.solver.updateConstantTo(data.heightConstraint, 500)
-		data.solver.updateVariables()
+
+	// Durées mesurées côté worker (ms) : premier envoi sur le main thread -> sortie de la dernière réponse du worker.
+	// Même horloge (epoch) des deux côtés : performance.timeOrigin + performance.now().
+	var workerSamples = {}
+	var sendSamples = {}
+	function makeWorkerBench(name, batch) {
+		var samples = (workerSamples[name] = [])
+		var sends = (sendSamples[name] = [])
+		return function (deferred) {
+			var data = kiwiData3
+			var t0 = performance.timeOrigin + performance.now()
+			for (var i = 0; i < batch; i++) {
+				data.solver.updateConstantTo(data.widthConstraint, 100)
+				data.solver.updateConstantTo(data.heightConstraint, 50)
+				data.solver.updateVariables()
+				data.solver.updateConstantTo(data.widthConstraint, 200)
+				data.solver.updateConstantTo(data.heightConstraint, 500)
+				data.solver.updateVariables()
+			}
+			sends.push(performance.timeOrigin + performance.now() - t0) // main thread : boucle d'envoi seule
+			var done = false
+			data.solver.time(function (tWorker) {
+				if (done) return // garde-fou : un seul résolve par cycle
+				done = true
+				samples.push(tWorker - t0)
+				deferred.resolve()
+			})
+		}
+	}
+	function logWorkerStats(name, batch) {
+		var s = workerSamples[name].slice().sort(function (a, b) { return a - b })
+		if (!s.length) return
+		var median = s[s.length >> 1]
+		var sd = sendSamples[name].slice().sort(function (a, b) { return a - b })
+		var sendMedian = sd[sd.length >> 1]
+		log(name + ' (worker side): median ' + median.toFixed(3) + ' ms per batch, min ' + s[0].toFixed(3) +
+			' ms => ' + Math.round((batch * 1000) / median).toLocaleString() + ' sequences/sec')
+		log(name + ' (main thread): send loop median ' + sendMedian.toFixed(3) + ' ms per batch (' +
+			Math.round((sendMedian / median) * 100) + '% of the worker-side time)')
 	}
 
 	function runBench(name, benchmarks, callback) {
 		log('----- Running ' + name + ' benchmark...')
 		var suite = new Benchmark.Suite()
 		for (var i = 0; i < benchmarks.length; i++) {
-			suite.add(benchmarks[i].name, benchmarks[i].fn)
+			suite.add(benchmarks[i].name, {defer: !!benchmarks[i].defer, fn: benchmarks[i].fn})
 		}
 		suite
 			.on('cycle', function (event) {
@@ -544,6 +575,8 @@ async function main() {
 			.run({async: true})
 	}
 
+	await new Promise(function (resolve) { kiwiData3.solver.time(function () { resolve() }) })
+
 	runBench(
 		'creation',
 		[
@@ -556,8 +589,15 @@ async function main() {
 				{name: 'Cassowary.js', fn: solveCassowary},
 				{name: 'kiwi suggestValue', fn: solveKiwi},
 				{name: 'kiwi updateConstantTo', fn: solveKiwi2},
-				{name: 'kiwi updateConstantTo with web worker', fn: solveKiwiWorker},
-			])
+			], function () {
+				runBench('solving worker', [
+					{name: 'worker latency (1 sequence, first in -> last out)', defer: true, fn: makeWorkerBench('worker latency', 1)},
+					{name: 'worker throughput (1000 sequences, first in -> last out)', defer: true, fn: makeWorkerBench('worker throughput', 1000)},
+				], function() {
+					logWorkerStats('worker latency', 1)
+					logWorkerStats('worker throughput', 1000)
+				})
+			})
 		},
 	)
 }

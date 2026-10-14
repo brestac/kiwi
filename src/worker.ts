@@ -131,10 +131,12 @@ function handleCommand(type: number, data: Int32Array, size: number) {
         solver().updateVariables()
       }
     }
+      break
     case SolverCommand.TIME: {
-      const time = new Date().getTime()
+      const time = performance.timeOrigin + performance.now()
       ctx.postMessage({ type: SolverCommand.TIME, data: time })
     }
+      break
     default:
       break
   }
