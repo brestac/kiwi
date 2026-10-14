@@ -303,6 +303,10 @@ export class Solver {
 		return this._cnMap.array.map(({ first }) => first)
 	}
 
+  public getConstraintById(id: number) : Constraint | undefined {
+    return this._cnMap.findById(id)?.first
+  }
+
 	/**
 	 * Add an edit variable to the solver.
 	 *
@@ -413,7 +417,7 @@ export class Solver {
 			let { first: variable, second: symbol } = vars.itemAt(i)
 			let rowPair = rows.find(symbol)
 
-      if (sharedValues) {        
+      if (sharedValues) {
         if (rowPair !== undefined) {
   				vars.insertValueAt(rowPair.second.constant(), variable._sharedOutputIndex, variable._notify)
   			} else {

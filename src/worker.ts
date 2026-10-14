@@ -89,7 +89,8 @@ function handleCommand(type: number, data: Int32Array, size: number) {
       break
     case SolverCommand.UPDATE_CONSTANT: {
       const id = data.at(0) as number
-      const constraint = solver().getConstraints().find(cst => cst.id() === id)
+      const constraint = solver().getConstraintById(id)
+      
       if (constraint !== undefined) {
         solver().updateConstantTo(constraint, data.at(1) as number)
         if (AUTO_UPDATE) {
@@ -100,7 +101,8 @@ function handleCommand(type: number, data: Int32Array, size: number) {
     }
     case SolverCommand.UPDATE_STRENGTH: {
       const id = data.at(0) as number
-      const constraint = solver().getConstraints().find(cst => cst.id() === id)
+      const constraint = solver().getConstraintById(id)
+
       if (constraint !== undefined) {
         solver().updateStrengthTo(constraint, SymbolicWeight.fromBinary(data.slice(1, 2)))
         if (AUTO_UPDATE) {
