@@ -12,7 +12,7 @@ ctx.onmessage = (e: MessageEvent<any>) => {
 
 	ctx.postMessage({ type: SolverCommand.AKNOWLEDGE, data: type })
 
-  new SolverWorker(data.output, new CommandConsumer(data.input)).run()
+  new SolverWorker(data.output, new CommandConsumer(data.input), data.time).run()
 }
 
 export default ctx

@@ -12,7 +12,8 @@ export class SolverInterface {
 	private _sharedOuputArray: Int32Array
 	private _sharedOutputIndex: number = 0
 	private _lastCommand: number | undefined = undefined
-  private _timeCallback: ((date: number) => void) | undefined = undefined
+	private _timeSeq: Int32Array
+	private _timeVal: Float64Array
 
   constructor() {
 		this._worker = new MyWorker()
@@ -23,9 +24,13 @@ export class SolverInterface {
     const inputBuffer = createCommandBuffer() // 65 536 words by default
 		this._commands = new CommandProducer(inputBuffer)
 
+		const timeBuffer = new SharedArrayBuffer(16)
+		this._timeSeq = new Int32Array(timeBuffer, 0, 2)
+		this._timeVal = new Float64Array(timeBuffer, 8, 1)
+
 		this._worker.postMessage({
 			type: SolverCommand.INIT,
-			data: { input: inputBuffer, output: this._sharedOuputArray },
+			data: { input: inputBuffer, output: this._sharedOuputArray, time: timeBuffer },
 		})
 
 		this._worker.onmessage = (event: any) => {
@@ -35,11 +40,6 @@ export class SolverInterface {
 				case SolverCommand.AKNOWLEDGE:
 					console.log(data)
 					break;
-				case SolverCommand.TIME: {
-					if (this._timeCallback !== undefined) {
-						this._timeCallback(data)
-					}
-				}
 				default:
 					break;
 			}
@@ -155,8 +155,12 @@ export class SolverInterface {
 	}
 
 	public time(callback: (date: number) => void) {
-		this._timeCallback = callback
+		const seq = Atomics.load(this._timeSeq, 0) // lu AVANT l'envoi de la commande
 		this.sendCommand(SolverCommand.TIME)
+		const r = Atomics.waitAsync(this._timeSeq, 0, seq)
+		const done = () => callback(this._timeVal[0])
+		if (r.async) r.value.then(done)
+		else done() // le worker a déjà répondu : "not-equal", valeur déjà prête
 	}
 }
 

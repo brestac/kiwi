@@ -8,12 +8,16 @@ const UPDATE_INTERVAL_MS = 16
 
 export class SolverWorker extends Solver {
   private _commands: CommandConsumer
+  private _timeSeq: Int32Array
+  private _timeVal: Float64Array
   private _needsUpdateVariables: boolean = false
   private _lastUpdate: number = -Infinity
 
-  constructor(output: Int32Array, input: CommandConsumer) {
+  constructor(output: Int32Array, input: CommandConsumer, timeBuffer: SharedArrayBuffer) {
     super(output)
     this._commands = input
+    this._timeSeq = new Int32Array(timeBuffer, 0, 2)
+    this._timeVal = new Float64Array(timeBuffer, 8, 1)
   }
 
   public run() : void {
@@ -82,11 +86,11 @@ export class SolverWorker extends Solver {
         this._suggestValue(id, value)
   		}
   			break
-  		case SolverCommand.TIME: {
-  			const time = performance.timeOrigin + performance.now()
-        //ctx.postMessage({ type: SolverCommand.TIME, data: time })
-  		}
-  			break
+      case SolverCommand.TIME:
+        this._timeVal[0] = performance.timeOrigin + performance.now() // juste avant de "sortir"
+        Atomics.add(this._timeSeq, 0, 1)
+        Atomics.notify(this._timeSeq, 0)
+        break
   		default:
   			break
   	}
