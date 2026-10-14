@@ -147,8 +147,8 @@ function handleCommand(type: number, data: Int32Array, size: number) {
 // Boucle bloquante : Atomics.wait est autorisé dans un worker.
 function run() {
   while(true) {
-    const { type, payload } = _commands.next()
-    handleCommand(type, payload, payload.length)
+    const type = _commands.next()
+    handleCommand(type, _commands.payload, _commands.size)
   }
 }
 

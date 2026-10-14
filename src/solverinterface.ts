@@ -50,6 +50,11 @@ export class SolverInterface {
 		this._commands.send(type, payload)
 		this._lastCommand = type
 	}
+
+	private sendCommand2(type: number, a: number, b: number): void {
+		this._commands.send2(type, a, b)
+		this._lastCommand = type
+	}
 /*
 	private watchVariable(variable: Variable): void {
 		if (variable._sharedOutputIndex !== -1) return
@@ -112,8 +117,7 @@ export class SolverInterface {
 
 	public updateConstantTo(constraint: Constraint, constant: number): void {
 		const id = constraint.id()
-		const payload = [id, constant]
-		this.sendCommand(SolverCommand.UPDATE_CONSTANT, payload)
+		this.sendCommand2(SolverCommand.UPDATE_CONSTANT, id, constant)
 	}
 
 	public updateStrengthTo(constraint: Constraint, strength: SymbolicWeight): void {
@@ -138,8 +142,7 @@ export class SolverInterface {
 
 	public suggestValue(variable: Variable, value: number): void {
 		const id = variable.id()
-		const payload = [id, value]
-		this.sendCommand(SolverCommand.SUGGEST_VALUE, payload)
+		this.sendCommand2(SolverCommand.SUGGEST_VALUE, id, value)
 	}
 
 	public updateVariables(): void {
