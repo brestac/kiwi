@@ -23,7 +23,7 @@ export function createCommandBuffer(words = 1 << 16): SharedArrayBuffer {
 
 /** Côté main thread : ne bloque jamais. */
 export class CommandProducer {
-  private b: Int32Array
+  private buf: Int32Array
   private mask: number
   private tail = 0 // copie locale : le producteur est le seul à écrire TAIL
   private head = 0 // copie en cache de HEAD, relue seulement quand l'anneau paraît plein
@@ -35,8 +35,8 @@ export class CommandProducer {
   private pw = 0 // index d'écriture dans pend
 
   constructor(sab: SharedArrayBuffer) {
-    this.b = new Int32Array(sab)
-    this.mask = this.b.length - HEADER - 1
+    this.buf = new Int32Array(sab)
+    this.mask = this.buf.length - HEADER - 1
   }
 
   /** Cas général. */
@@ -77,7 +77,7 @@ export class CommandProducer {
   }
 
   private put(i: number, v: number): void {
-    this.b[HEADER + ((this.tail + i) & this.mask)] = v
+    this.buf[HEADER + ((this.tail + i) & this.mask)] = v
   }
 
   private free(): number {
@@ -87,7 +87,7 @@ export class CommandProducer {
   private reserve(n: number): boolean {
     if (this.pw !== this.pr) return false // on garde l'ordre : tout passe par la zone d'attente
     if (n <= this.free()) return true
-    this.head = Atomics.load(this.b, HEAD)
+    this.head = Atomics.load(this.buf, HEAD)
     return n <= this.free()
   }
 
@@ -99,9 +99,9 @@ export class CommandProducer {
   }
 
   private publish(): void {
-    Atomics.store(this.b, TAIL, this.tail)
+    Atomics.store(this.buf, TAIL, this.tail)
     this.published = this.tail
-    if (Atomics.load(this.b, CSLEEP) === 1) Atomics.notify(this.b, TAIL)
+    if (Atomics.load(this.buf, CSLEEP) === 1) Atomics.notify(this.buf, TAIL)
   }
 
   private enqueue(words: number[]): void {
@@ -128,7 +128,7 @@ export class CommandProducer {
     while (this.pr < this.pw) {
       const n = this.pend[this.pr + 1] + 2
       if (n > this.free()) {
-        this.head = Atomics.load(this.b, HEAD)
+        this.head = Atomics.load(this.buf, HEAD)
         if (n > this.free()) {
           if (wrote) this.publish()
           this.armWait()
@@ -148,17 +148,17 @@ export class CommandProducer {
   private armWait(): void {
     if (this.armed) return
     this.armed = true
-    Atomics.store(this.b, PWAIT, 1)
-    const head = Atomics.load(this.b, HEAD) // relecture après l'annonce : évite de rater l'avance
+    Atomics.store(this.buf, PWAIT, 1)
+    const head = Atomics.load(this.buf, HEAD) // relecture après l'annonce : évite de rater l'avance
     const retry = () => {
       this.armed = false
-      Atomics.store(this.b, PWAIT, 0)
+      Atomics.store(this.buf, PWAIT, 0)
       this.flush()
     }
     if (head !== this.head) {
       queueMicrotask(retry)
     } else if (typeof Atomics.waitAsync === 'function') {
-      const r = Atomics.waitAsync(this.b, HEAD, head)
+      const r = Atomics.waitAsync(this.buf, HEAD, head)
       if (r.async) r.value.then(retry)
       else queueMicrotask(retry)
     } else {
@@ -169,7 +169,7 @@ export class CommandProducer {
 
 /** Côté worker : lecture bloquante, sans allocation par commande. */
 export class CommandConsumer {
-  private b: Int32Array
+  private buf: Int32Array
   private mask: number
   private head = 0
   /** Payload de la dernière commande lue. Réutilisé : valide jusqu'au prochain next(), seuls les `size` premiers mots comptent. */
@@ -177,18 +177,18 @@ export class CommandConsumer {
   size = 0
 
   constructor(sab: SharedArrayBuffer) {
-    this.b = new Int32Array(sab)
-    this.mask = this.b.length - HEADER - 1
+    this.buf = new Int32Array(sab)
+    this.mask = this.buf.length - HEADER - 1
   }
 
   /** True s'il reste des commandes déjà publiées (utile pour ne mettre à jour les variables qu'en fin de rafale). */
   hasPending(): boolean {
-    return Atomics.load(this.b, TAIL) !== this.head
+    return Atomics.load(this.buf, TAIL) !== this.head
   }
 
   /** Bloque jusqu'à la prochaine commande ; renvoie son type (payload dans this.payload, taille dans this.size). */
   next(): number {
-    const b = this.b
+    const b = this.buf
     const head = this.head
     let tail = Atomics.load(b, TAIL)
     while (tail === head) {
