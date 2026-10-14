@@ -616,39 +616,48 @@ describe('import kiwi', function () {
 		if (typeof window !== 'undefined') {
 			describe('Worker', function () {
 
-				it('addConstraints', function () {
+				it('addConstraints', function (done) {
 					const worker = kiwi.Solver.create({worker: true})
 					const x = new kiwi.Variable("x")
 					x.subscribe((value, prev) => {
 						assert.equal(value, 100)
+						done()
 					})
 
 					const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
 					worker.addConstraints([constraint])
+					worker.updateVariables()
 				})
 
-				it('addConstraints => updateConstraint', function (done) {
+				it('addConstraints => updateConstraint', async function (done) {
 					const worker = kiwi.Solver.create({worker: true})
 
 					const x = new kiwi.Variable("x")
-					const expected_constants = [100, 50, 60]
-					let i = 0;
+					const expected = [100, 50, 60]
+					let result = []
+					let compare = (a,b) => a.length == b.length && a.every(i => b.includes(i))
 
 					x.subscribe((value, prev) => {
-						const expected = expected_constants.at(i++)
+						result.push(value)
 
-						if (value === expected) {
-							done()
-						} else {
-							done(new Error(`expected value == ${expected}, was ${value}`))
+						if (result.length == expected.length) {
+							if (compare(expected, result)) {
+								done()
+							} else {
+								done(new Error(`expected values == ${expected_constants}, was ${result}`))
+							}
 						}
 					})
 
 					const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
 					worker.addConstraints([constraint])
 					worker.updateVariables()
+					await wait(20)
+
 					worker.updateConstantTo(constraint, 50)
 					worker.updateVariables()
+					await wait(20)
+
 					worker.updateConstantTo(constraint, 60)
 					worker.updateVariables()
 				})
@@ -657,8 +666,4 @@ describe('import kiwi', function () {
 	})
 })
 
-function wait(delay) {
-	return new Promise((res, rej) => {
-		window.setTimeout(res, delay, true)
-	})
-}
+const wait = delay => new Promise(res => window.setTimeout(res, delay, true))

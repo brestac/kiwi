@@ -16,6 +16,9 @@ const CSLEEP = 2
 const PWAIT = 3
 const HEADER = 4
 
+/** Valeur renvoyée par CommandConsumer.next(timeoutMs) quand le délai expire sans commande. */
+export const NO_COMMAND = -1
+
 export function createCommandBuffer(words = 1 << 16): SharedArrayBuffer {
   if (words < 8 || (words & (words - 1)) !== 0) throw new Error('queue size must be a power of two')
   return new SharedArrayBuffer((HEADER + words) * Int32Array.BYTES_PER_ELEMENT)
@@ -186,15 +189,21 @@ export class CommandConsumer {
     return Atomics.load(this.buf, TAIL) !== this.head
   }
 
-  /** Bloque jusqu'à la prochaine commande ; renvoie son type (payload dans this.payload, taille dans this.size). */
-  next(): number {
+  /**
+   * Bloque jusqu'à la prochaine commande ; renvoie son type (payload dans this.payload, taille dans this.size).
+   * Avec `timeoutMs`, renvoie NO_COMMAND (-1) si rien n'est arrivé dans ce délai.
+   */
+  next(timeoutMs: number = Infinity): number {
     const b = this.buf
     const head = this.head
+    const deadline = timeoutMs === Infinity ? Infinity : performance.now() + timeoutMs
     let tail = Atomics.load(b, TAIL)
     while (tail === head) {
+      const remaining = deadline - performance.now()
+      if (remaining <= 0) return NO_COMMAND
       Atomics.store(b, CSLEEP, 1) // on annonce qu'on dort, puis on revérifie TAIL (pas de réveil perdu)
       tail = Atomics.load(b, TAIL)
-      if (tail === head) Atomics.wait(b, TAIL, tail)
+      if (tail === head) Atomics.wait(b, TAIL, tail, remaining)
       Atomics.store(b, CSLEEP, 0)
       tail = Atomics.load(b, TAIL)
     }

@@ -3,12 +3,22 @@ import { Solver } from './solver.js'
 import { SolverCommand } from './solvercommand.js'
 import { Constraint } from './constraint.js'
 import { SymbolicWeight } from './symbolicweight.js'
-import { CommandConsumer } from './commandqueue.js'
+import { CommandConsumer, NO_COMMAND } from './commandqueue.js'
 
-const AUTO_UPDATE = false
 const ctx: Worker = self as any
 let _solver: Solver
 let _commands: CommandConsumer
+
+// updateVariables() est limité à une fois par UPDATE_INTERVAL_MS, avec une mise à jour finale garantie
+const UPDATE_INTERVAL_MS = 16
+let _needsUpdateVariables = false
+let _lastUpdate = -Infinity
+
+function flushVariables(now: number): void {
+	_needsUpdateVariables = false
+	_lastUpdate = now
+	solver().updateVariables()
+}
 
 function solver(): Solver {
 	return _solver
@@ -65,41 +75,26 @@ function handleCommand(type: number, data: Int32Array, size: number) {
 	switch (type) {
 		case SolverCommand.ADD_CONSTRAINTS: {
 			addConstraintsFromBinary(data, size)
-
-			if (AUTO_UPDATE) {
-				solver().updateVariables()
-			}
 		}
 			break
 		case SolverCommand.REMOVE_CONSTRAINTS: {
 			removeConstraintsFromBinary(data, size)
-
-			if (AUTO_UPDATE) {
-				solver().updateVariables()
-			}
 		}
 			break
 		case SolverCommand.UPDATE_CONSTANT: {
 			const id = data.at(0) as number
 			const constant = data.at(1) as number
 			solver()._updateConstantToById(id, constant)
-			if (AUTO_UPDATE) {
-				solver().updateVariables()
-			}
 		}
 			break
 		case SolverCommand.UPDATE_STRENGTH: {
 			const id = data.at(0) as number
 			const strength = SymbolicWeight.fromBinary(data.slice(1, 2))
-
 			solver()._updateStrengthToById(id, strength)
-			if (AUTO_UPDATE) {
-				solver().updateVariables()
-			}
 			break
 		}
 		case SolverCommand.UPDATE_VARIABLES:
-			solver().updateVariables()
+			_needsUpdateVariables = true // exécuté par run(), au plus une fois par UPDATE_INTERVAL_MS
 			break
 		case SolverCommand.ADD_EDIT_VARIABLE: {
 			const id = data.at(0) as number
@@ -116,9 +111,6 @@ function handleCommand(type: number, data: Int32Array, size: number) {
 			const id = data.at(0) as number
 			const value = data.at(1) as number
 			suggestValue(id, value)
-			if (AUTO_UPDATE) {
-				solver().updateVariables()
-			}
 		}
 			break
 		case SolverCommand.TIME: {
@@ -134,7 +126,18 @@ function handleCommand(type: number, data: Int32Array, size: number) {
 // Boucle bloquante : Atomics.wait est autorisé dans un worker.
 function run() {
 	while (true) {
-		const type = _commands.next()
+		let type: number
+		if (_needsUpdateVariables) {
+			const now = performance.now()
+			if (now >= _lastUpdate + UPDATE_INTERVAL_MS) flushVariables(now) // échéance atteinte (ou worker inactif : latence minimale)
+		}
+		if (_needsUpdateVariables) {
+			// Mise à jour en attente : on ne dort pas plus longtemps que la prochaine échéance.
+			type = _commands.next(Math.max(0, _lastUpdate + UPDATE_INTERVAL_MS - performance.now()))
+			if (type === NO_COMMAND) continue // l'échéance est passée : le haut de la boucle fait la mise à jour
+		} else {
+			type = _commands.next()
+		}
 		handleCommand(type, _commands.payload, _commands.size)
 	}
 }
