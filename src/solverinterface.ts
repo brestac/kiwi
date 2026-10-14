@@ -122,22 +122,21 @@ export class SolverInterface {
 
 	public updateStrengthTo(constraint: Constraint, strength: SymbolicWeight): void {
 		const id = constraint.id()
-		const levels = strength.toBinary()
-		const payload = [id, ...levels]
+		const strength_ = strength.toBinary()
+		const payload = [id, ...strength_]
 		this.sendCommand(SolverCommand.UPDATE_STRENGTH, payload)
 	}
 
 	public addEditVariable(variable: Variable, strength: SymbolicWeight): void {
 		const id = variable.id()
-		const levels = strength.toBinary()
-		const payload = [id, ...levels]
+		const strength_ = strength.toBinary()
+		const payload = [id, ...strength_]
 		this.sendCommand(SolverCommand.ADD_EDIT_VARIABLE, payload)
 	}
 
 	public removeEditVariable(variable: Variable): void {
 		const id = variable.id()
-		const payload = [id]
-		this.sendCommand(SolverCommand.REMOVE_EDIT_VARIABLE, payload)
+		this.sendCommand(SolverCommand.REMOVE_EDIT_VARIABLE, [id])
 	}
 
 	public suggestValue(variable: Variable, value: number): void {
