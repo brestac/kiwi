@@ -8,6 +8,6 @@ export enum SolverCommand {
   REMOVE_EDIT_VARIABLE,
   SUGGEST_VALUE,
   UPDATE_VARIABLES,
-  AKNOWLEDGE,
+  //AKNOWLEDGE,
   TIME
 }

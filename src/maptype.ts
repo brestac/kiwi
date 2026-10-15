@@ -1,13 +1,8 @@
 
 export interface IMap<T extends {id(): number}, U> extends IndexedMap<T, U> {}
-export interface FlatValuesMap<T extends {id(): number, value(): number}, U> extends IndexedMap<T, U> {}
 
 export function createMap<T extends {id(): number}, U>(): IMap<T, U> {
   return new IndexedMap<T, U>()
-}
-
-export function createFlatValuesMap<T extends {id(): number, value(): number}, U>(values: Int32Array) {
-  return new FlatValuesMap<T, U>(values)
 }
 
 class IndexedMap<T extends {id(): number}, U> {
@@ -137,62 +132,12 @@ class IndexedMap<T extends {id(): number}, U> {
   }
 }
 
-export class FlatValuesMap<T extends {id(): number, value(): number}, U> extends IndexedMap<T, U> {
-
-  private _values : Int32Array
-
-  constructor(values: Int32Array) {
-    super()
-    this._values = values
-  }
-
-  /**
-   * @param key The key portion of the pair.
-   * @param value The value portion of the pair.
-   */
-  public setDefault(key: T, factory: () => U): Pair<T, U> {
-    const i = this.index[key.id()]
-
-    if (i === undefined) {
-      const pair = new Pair(key, factory())
-      const size = this.array.length
-      this.index[key.id()] = size
-      this.array.push(pair)
-
-      if (size > this._values.length) {
-        let buffer = this._values.buffer as SharedArrayBuffer
-        buffer.grow(size * this._values.BYTES_PER_ELEMENT)
-      }
-
-      this._values[size] = key.value()
-
-      return pair
-    } else {
-      return this.array[i]
-    }
-  }
-
-  public findValue(key: T): number | bigint | undefined {
-    const i = this.index[key.id()] as number
-    return Atomics.load(this._values, i)
-  }
-
-  public insertValueAt(value: number, index: number, notify: number = 0) : void {
-
-    Atomics.store(this._values, index, Math.round(value))
-
-    if (notify == 1) {
-      Atomics.notify(this._values, index, 1)
-    }
-  }
-}
-
 /**
  * A class which defines a generic pair object.
  * @private
  */
 // tslint:disable: max-classes-per-file
-class Pair<T, U> {
+export class Pair<T, U> {
   /**
    * Construct a new Pair object.
    *

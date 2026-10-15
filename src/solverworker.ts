@@ -1,23 +1,95 @@
-import { Solver } from './solver.js'
+import { Solver, Symbol, SymbolType } from './solver.js'
 import { SolverCommand } from './solvercommand.js'
 import { Constraint } from './constraint.js'
 import { SymbolicWeight } from './symbolicweight.js'
 import { CommandConsumer, NO_COMMAND } from './commandqueue.js'
+import { IMap, Pair } from './maptype.js'
+import { Variable } from './variable.js'
 
 const UPDATE_INTERVAL_MS = 16
 
 export class SolverWorker extends Solver {
   private _commands: CommandConsumer
+  private _output: Int32Array
   private _timeSeq: Int32Array
   private _timeVal: Float64Array
   private _needsUpdateVariables: boolean = false
   private _lastUpdate: number = -Infinity
 
   constructor(output: Int32Array, input: CommandConsumer, timeBuffer: SharedArrayBuffer) {
-    super(output)
+    super()
     this._commands = input
+    this._output = output
     this._timeSeq = new Int32Array(timeBuffer, 0, 2)
     this._timeVal = new Float64Array(timeBuffer, 8, 1)
+  }
+
+  /**
+  * Update the values of the variables.
+  */
+  public updateVariables(): void {
+    let vars = this._varMap
+    let rows = this._rowMap
+
+    for (let i = 0, n = vars.size(); i < n; ++i) {
+      let { first: variable, second: symbol } = vars.itemAt(i)
+      let rowPair = rows.find(symbol)
+
+      if (rowPair !== undefined) {
+        this.insertValueAt(rowPair.second.constant(), variable._sharedOutputIndex, variable._notify)
+      } else {
+        this.insertValueAt(0, variable._sharedOutputIndex, variable._notify)
+      }
+    }
+  }
+
+  /**
+  * Get the symbol for the given variable.
+  *
+  * If a symbol does not exist for the variable, one will be created.
+  * @private
+  */
+  protected _getVarSymbol(variable: Variable): Symbol {
+    let factory = () => this._makeSymbol(SymbolType.External)
+    return this.setDefault(variable, factory).second
+  }
+
+  private setDefault(key: Variable, factory: () => Symbol): Pair<Variable, Symbol> {
+    const i = this._varMap.index[key.id()]
+
+    if (i === undefined) {
+      const pair = new Pair(key, factory())
+      const size = this._varMap.array.length
+      this._varMap.index[key.id()] = size
+      this._varMap.array.push(pair)
+
+      if (size > this._output.length) {
+        let buffer = this._output.buffer as SharedArrayBuffer
+        buffer.grow(size * this._output.BYTES_PER_ELEMENT)
+      }
+
+      this._output[key._sharedOutputIndex] = key.value()
+
+      return pair
+    } else {
+      return this._varMap.array[i]
+    }
+  }
+
+  private insertValueAt(value: number, index: number, notify: number = 0) : void {
+
+    Atomics.store(this._output, index, Math.round(value))
+
+    if (notify == 1) {
+      Atomics.notify(this._output, index, 1)
+    }
+  }
+
+  private getVariable(id: number): Variable | undefined {
+    const i = this._varMap.index[id]
+    if (i === undefined) return undefined
+
+    return this._varMap.array[i]?.first
   }
 
   public run() : void {
@@ -41,7 +113,7 @@ export class SolverWorker extends Solver {
   private flushVariables(now: number): void {
   	this._needsUpdateVariables = false
   	this._lastUpdate = now
-    super.updateVariables()
+    this.updateVariables()
   }
 
   private handleCommand(type: number) : void {
@@ -124,21 +196,21 @@ export class SolverWorker extends Solver {
   }
 
   private _addEditVariable(id: number, strength: SymbolicWeight): void {
-  	const variable = super.getVariable(id)
+    const variable = this.getVariable(id)
   	if (variable !== undefined) {
   		super.addEditVariable(variable, strength)
   	}
   }
 
   private _removeEditVariable(id: number): void {
-  	const variable = super.getVariable(id)
+    const variable = this.getVariable(id)
   	if (variable !== undefined) {
   		super.removeEditVariable(variable)
   	}
   }
 
   private _suggestValue(id: number, value: number): void {
-  	const variable = super.getVariable(id)
+    const variable = this.getVariable(id)
   	if (variable !== undefined) {
       super.suggestValue(variable, value)
   	}

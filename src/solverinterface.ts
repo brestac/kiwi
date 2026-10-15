@@ -33,17 +33,17 @@ export class SolverInterface {
 			data: { input: inputBuffer, output: this._sharedOuputArray, time: timeBuffer },
 		})
 
-		this._worker.onmessage = (event: any) => {
-			const { type, data } = event.data
-
-			switch (type) {
-				case SolverCommand.AKNOWLEDGE:
-					console.log(data)
-					break;
-				default:
-					break;
-			}
-		}
+		// this._worker.onmessage = (event: any) => {
+		// 	const { type, data } = event.data
+		//
+		// 	switch (type) {
+		// 		case SolverCommand.AKNOWLEDGE:
+		// 			console.log(data)
+		// 			break;
+		// 		default:
+		// 			break;
+		// 	}
+		// }
 	}
 
   public sendCommand(type: number, payload: ArrayLike<number> = []): void {

@@ -10,7 +10,7 @@ ctx.onmessage = (e: MessageEvent<any>) => {
 
 	if (type !== SolverCommand.INIT) return
 
-	ctx.postMessage({ type: SolverCommand.AKNOWLEDGE, data: type })
+  //ctx.postMessage({ type: SolverCommand.AKNOWLEDGE, data: type })
 
   new SolverWorker(data.output, new CommandConsumer(data.input), data.time).run()
 }
