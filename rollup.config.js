@@ -59,7 +59,7 @@ const license = /*js*/ `
  */
 `
 
-export default defineConfig({
+const worker = defineConfig({
 	input: './src/kiwi.ts',
 	output: {
 		file: './dist/kiwi.js',
@@ -75,10 +75,10 @@ export default defineConfig({
 			sourcemap: false,
 		}),
     // 2. On compile le reste du TypeScript
-    typescript(),
+		typescript(),
   ],
 });
-/*
+
 // we generate three output formats:
 // - a fully ES6 version in tmp/kiwi.js, used just as the input to jsdoc2md.
 
@@ -93,5 +93,4 @@ const doc = {
   },
 }
 
-export default [doc]
-*/
+export default [worker, doc]
