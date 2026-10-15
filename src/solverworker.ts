@@ -34,7 +34,7 @@ export class SolverWorker extends Solver {
   		} else {
   			type = this._commands.next()
   		}
-  		this.handleCommand(type, this._commands.payload, this._commands.size)
+  		this.handleCommand(type)
   	}
   }
 
@@ -44,25 +44,27 @@ export class SolverWorker extends Solver {
     super.updateVariables()
   }
 
-  private handleCommand(type: number, data: Int32Array, size: number) : void {
+  private handleCommand(type: number) : void {
+    const payload = this._commands.payload
+
   	switch (type) {
   		case SolverCommand.ADD_CONSTRAINTS: {
-        this.addConstraintsFromBinary(data, size)
+        this.addConstraintsFromBinary(payload, this._commands.size)
   		}
   			break
   		case SolverCommand.REMOVE_CONSTRAINTS: {
-  			this.removeConstraintsFromBinary(data, size)
+  			this.removeConstraintsFromBinary(payload, this._commands.size)
   		}
   			break
   		case SolverCommand.UPDATE_CONSTANT: {
-  			const id = data.at(0) as number
-  			const constant = data.at(1) as number
+  			const id = payload.at(0) as number
+  			const constant = payload.at(1) as number
         super._updateConstantToById(id, constant)
   		}
   			break
   		case SolverCommand.UPDATE_STRENGTH: {
-  			const id = data.at(0) as number
-  			const strength = SymbolicWeight.fromBinary(data.slice(1, 2))
+  			const id = payload.at(0) as number
+  			const strength = SymbolicWeight.fromBinary(payload.slice(1, 2))
   			super._updateStrengthToById(id, strength)
   			break
   		}
@@ -70,19 +72,19 @@ export class SolverWorker extends Solver {
         this._needsUpdateVariables = true // exécuté par run(), au plus une fois par UPDATE_INTERVAL_MS
   			break
   		case SolverCommand.ADD_EDIT_VARIABLE: {
-  			const id = data.at(0) as number
-  			const strength = SymbolicWeight.fromBinary(data.slice(1, size))
+  			const id = payload.at(0) as number
+  			const strength = SymbolicWeight.fromBinary(payload.slice(1, this._commands.size))
         this._addEditVariable(id, strength)
   		}
   			break
   		case SolverCommand.REMOVE_EDIT_VARIABLE: {
-  			const id = data.at(0) as number
+  			const id = payload.at(0) as number
         this._removeEditVariable(id)
   		}
   			break
   		case SolverCommand.SUGGEST_VALUE: {
-  			const id = data.at(0) as number
-  			const value = data.at(1) as number
+  			const id = payload.at(0) as number
+  			const value = payload.at(1) as number
         this._suggestValue(id, value)
   		}
   			break
