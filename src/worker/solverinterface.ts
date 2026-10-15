@@ -1,7 +1,8 @@
-import { Expression } from './expression.js'
-import { Constraint, Operator } from './constraint.js'
-import { SymbolicWeight } from './symbolicweight.js'
-import { Callback, Variable } from './variable.js'
+import { Expression } from '../expression.js'
+import { Constraint, Operator } from '../constraint.js'
+import { SymbolicWeight } from '../symbolicweight.js'
+import { Callback, Variable } from '../variable.js'
+
 import { SolverCommand } from './solvercommand.js'
 import MyWorker from 'web-worker:./worker'
 import { CommandProducer, createCommandBuffer } from './commandqueue.js'

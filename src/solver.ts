@@ -4,7 +4,8 @@ import { createMap, IMap } from './maptype.js'
 import { Strength } from './strength.js'
 import { SymbolicWeight } from './symbolicweight.js'
 import { Variable } from './variable.js'
-import type { SolverInterface } from './solverinterface.js'
+
+import type { SolverInterface } from './worker/solverinterface.js'
 /**
  * The constraint solver class.
  *

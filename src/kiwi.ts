@@ -6,7 +6,7 @@ export * from './symbolicweight.js'
 export * from './variable.js'
 
 import { Solver } from './solver.js'
-import { SolverInterface } from './solverinterface.js'
+import { SolverInterface } from './worker/solverinterface.js'
 
 export type { SolverInterface }
 

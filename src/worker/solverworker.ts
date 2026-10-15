@@ -1,10 +1,11 @@
-import { Solver, Symbol, SymbolType } from './solver.js'
+import { Solver, Symbol, SymbolType } from '../solver.js'
+import { Constraint } from '../constraint.js'
+import { SymbolicWeight } from '../symbolicweight.js'
+import { IMap, Pair } from '../maptype.js'
+import { Variable } from '../variable.js'
+
 import { SolverCommand } from './solvercommand.js'
-import { Constraint } from './constraint.js'
-import { SymbolicWeight } from './symbolicweight.js'
 import { CommandConsumer, NO_COMMAND } from './commandqueue.js'
-import { IMap, Pair } from './maptype.js'
-import { Variable } from './variable.js'
 
 const UPDATE_INTERVAL_MS = 16
 
