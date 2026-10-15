@@ -4,3 +4,10 @@ export * from './solver.js'
 export * from './strength.js'
 export * from './symbolicweight.js'
 export * from './variable.js'
+
+import { Solver } from './solver.js'
+import { SolverInterface } from './solverinterface.js'
+
+export type { SolverInterface }
+
+Solver.workerFactory = () => new SolverInterface()

@@ -4,7 +4,7 @@ import { createMap, IMap } from './maptype.js'
 import { Strength } from './strength.js'
 import { SymbolicWeight } from './symbolicweight.js'
 import { Variable } from './variable.js'
-import { SolverInterface } from './solverinterface.js'
+import type { SolverInterface } from './solverinterface.js'
 /**
  * The constraint solver class.
  *
@@ -22,12 +22,22 @@ export class Solver {
 	 */
 	public maxIterations = 1000
 
+	/**
+	 * Fabrique du mode worker, renseignée par kiwi.ts. Elle est injectée plutôt qu'importée ici : solver.ts est
+	 * importé par le worker (SolverWorker), et importer SolverInterface (qui importe le worker) créerait un cycle.
+	 * @private
+	 */
+	static workerFactory: (() => SolverInterface) | undefined = undefined
+
 	static create(options: SolverOptions = {}): Solver | SolverInterface {
     if (options?.worker == true) {
       if (!globalThis.crossOriginIsolated) {
         throw new Error('Option worker=true. The client is not crossOriginIsolated.\nYou may need to add the following headers to your server:\nCross-Origin-Opener-Policy=same-origin\nCross-Origin-Embedder-Policy=require-corp')
       }
-      return new SolverInterface()
+      if (!Solver.workerFactory) {
+        throw new Error('Option worker=true. Worker support is not registered: import Solver from the package entry point.')
+      }
+      return Solver.workerFactory()
     } else {
       return new Solver()
     }
