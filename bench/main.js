@@ -1,13 +1,15 @@
 /*global module:false*/
 /*eslint strict:false, quotes: [2, "single"] */
 
+import {Bench} from 'tinybench'
+
 var assert = typeof window === 'undefined' ? (await import('assert')).default : window.chai.assert
-var _ = typeof window === 'undefined' ? (await import('lodash')).default : window._
-var Platform = typeof window === 'undefined' ? (await import('platform')).default : window.Platform
-var Benchmark = typeof window === 'undefined' ? (await import('benchmark')).default : window.Benchmark
 var c = typeof window === 'undefined' ? (await import('cassowary')).default : window.c // cassowary
 
-main()
+main().catch(function (error) {
+	console.error(error)
+	if (typeof process !== 'undefined') process.exitCode = 1
+})
 async function main() {
 	// const kiwi = await import('@lume/kiwi') // self-referencing import does not work due to https://github.com/nodejs/node/issues/50334
 	const kiwi = await import('../dist/kiwi.js')
@@ -266,7 +268,7 @@ async function main() {
 	}
 
 	function createKiwiSolverWorker() {
-		var solver = kiwi.Solver.create({worker: true})
+		var solver = kiwi.Solver.create({worker: true, refreshRate:60})
 		var strength = kiwi.Strength.create(0, 900, 1000)
 
 		// super-view
@@ -482,7 +484,7 @@ async function main() {
 	}
 
 	var cassowaryData = createCassowarySolver()
-	function solveCassowary(data) {
+	function solveCassowary() {
 		var data = cassowaryData
 		data.solver.suggestValue(data.superView.width, 100)
 		data.solver.suggestValue(data.superView.height, 50)
@@ -493,7 +495,7 @@ async function main() {
 	}
 
 	var kiwiData = createKiwiSolver()
-	function solveKiwi(data) {
+	function solveKiwi() {
 		var data = kiwiData
 		data.solver.suggestValue(data.superView.width, 100)
 		data.solver.suggestValue(data.superView.height, 50)
@@ -504,7 +506,7 @@ async function main() {
 	}
 
 	var kiwiData2 = _createKiwiSolverNewAPI(true)
-	function solveKiwi2(data) {
+	function solveKiwi2() {
 		var data = kiwiData2
 		data.solver.updateConstantTo(data.widthConstraint, 100)
 		data.solver.updateConstantTo(data.heightConstraint, 50)
@@ -514,78 +516,141 @@ async function main() {
 		data.solver.updateVariables()
 	}
 
-	if (typeof window !== 'undefined') {
+	// Mesures (ms) collectées à chaque exécution du benchmark worker. Même horloge (epoch) des deux côtés :
+	// performance.timeOrigin + performance.now().
+	var workerSamples = {send: [], worker: []}
 
-		var kiwiData3 = createKiwiSolverWorker()
-
-		// Durées mesurées côté worker (ms) : premier envoi sur le main thread -> sortie de la dernière réponse du worker.
-		// Même horloge (epoch) des deux côtés : performance.timeOrigin + performance.now().
-
-	}
-
-	function makeWorkerBench(name, batch) {
-		return function (deferred) {
-			var data = kiwiData3
-
-			for (var i = 0; i < batch; i++) {
-				data.solver.updateConstantTo(data.widthConstraint, 100)
-				data.solver.updateConstantTo(data.heightConstraint, 50)
-				data.solver.updateVariables()
-				data.solver.updateConstantTo(data.widthConstraint, 200)
-				data.solver.updateConstantTo(data.heightConstraint, 500)
-				data.solver.updateVariables()
-			}
-			var done = false
+	// Une "opération" du benchmark worker : `batch` séquences de commandes envoyées au worker, puis une commande TIME.
+	// La promesse se résout quand la réponse TIME sort du worker : tinybench mesure donc de la première commande
+	// envoyée à la dernière réponse reçue (premier input -> dernier output).
+	function solveKiwiWorker(data, batch) {
+		var t0 = performance.timeOrigin + performance.now()
+		for (var i = 0; i < batch; i++) {
+			data.solver.updateConstantTo(data.widthConstraint, 100)
+			data.solver.updateConstantTo(data.heightConstraint, 50)
+			data.solver.updateVariables()
+			data.solver.updateConstantTo(data.widthConstraint, 200)
+			data.solver.updateConstantTo(data.heightConstraint, 500)
+			data.solver.updateVariables()
+		}
+		workerSamples.send.push(performance.timeOrigin + performance.now() - t0) // main thread : boucle d'envoi seule
+		return new Promise(function (resolve) {
 			data.solver.time(function (tWorker) {
-				if (done) return // garde-fou : un seul résolve par cycle
-				done = true
-				deferred.resolve()
-			})
-		}
-	}
-
-	function runBench(name, benchmarks, callback) {
-		log('----- Running ' + name + ' benchmark...')
-		var suite = new Benchmark.Suite()
-		for (var i = 0; i < benchmarks.length; i++) {
-			suite.add(benchmarks[i].name, {defer: !!benchmarks[i].defer, fn: benchmarks[i].fn})
-		}
-		suite
-			.on('cycle', function (event) {
-				log(String(event.target))
-			})
-			.on('complete', function () {
-				var fastest = this.filter('fastest')[0]
-				var slowest = this.filter('slowest')[0]
-				if (fastest !== slowest)
-				log('Fastest is ' + fastest.name + ' (± ' + Math.round((fastest.hz / slowest.hz) * 100) / 100 + 'x faster)')
-				if (callback) callback()
-			})
-			.run({async: true})
-	}
-
-	if (typeof window !== 'undefined') {
-		await new Promise(function (resolve) { kiwiData3.solver.time(function () { resolve() }) })
-	}
-
-	runBench(
-		'creation',
-		[
-			{name: 'Cassowary.js', fn: createCassowarySolver},
-			{name: 'kiwi', fn: createKiwiSolver},
-			{name: 'kiwi new API', fn: createKiwiSolverNewAPI},
-		],
-		function () {
-			runBench('solving', [
-				{name: 'Cassowary.js', fn: solveCassowary},
-				{name: 'kiwi suggestValue', fn: solveKiwi},
-				{name: 'kiwi updateConstantTo', fn: solveKiwi2},
-			], function () {
-				if (typeof window !== 'undefined') {
-					runBench('solving worker', [
-						{name: 'worker throughput (1000 sequences, first in -> last out)', defer: true, fn: makeWorkerBench('worker throughput', 1000)},
-					])
-				}
+				workerSamples.worker.push(tWorker - t0) // premier envoi -> sortie de la dernière réponse du worker
+				resolve()
 			})
 		})
+	}
+
+	function median(values) {
+		var sorted = values.slice().sort(function (a, b) {
+			return a - b
+		})
+		return sorted[sorted.length >> 1]
+	}
+
+	// Décomposition d'une exécution du benchmark worker (médianes, ramenées à une séquence).
+	// total = durée mesurée par tinybench (promesse résolue côté main thread).
+	function logWorkerStats(task, batch) {
+		if (task.result.state !== 'completed') return
+		var send = median(workerSamples.send)
+		var worker = median(workerSamples.worker)
+		var total = task.result.latency.p50
+		var us = function (ms) {
+			return ((ms * 1000) / batch).toFixed(2) + ' us/sequence'
+		}
+		log('  total (first in -> last output received): ' + us(total) + ' (median ' + total.toFixed(3) + ' ms per run)')
+		log('  worker side (first in -> last output leaves the worker): ' + us(worker) + ' => ' +
+			Math.round((batch * 1000) / worker).toLocaleString('en-US') + ' sequences/sec')
+		log('  main thread (send loop only): ' + us(send) + ' (' + Math.round((send / worker) * 100) + '% of the worker-side time)')
+		log('  return trip of the last output: ' + (Math.max(0, total - worker) * 1000).toFixed(0) + ' us per run')
+	}
+
+	// `ops` : nombre d'opérations élémentaires par exécution de la tâche (ex. 1000 séquences pour le worker),
+	// pour que les ops/sec soient comparables avec les autres lignes.
+	function formatTask(task, ops) {
+		var result = task.result
+		if (result.state !== 'completed') return task.name + ' failed: ' + (result.error && result.error.message)
+		return (
+			task.name +
+			' x ' +
+			Math.round(result.throughput.mean * ops).toLocaleString('en-US') +
+			' ops/sec ±' +
+			result.throughput.rme.toFixed(2) +
+			'% (' +
+			result.latency.samplesCount +
+			' runs sampled)'
+		)
+	}
+
+	// Les tâches peuvent être synchrones ou asynchrones (fonction renvoyant une promesse) : tinybench attend la promesse.
+	async function runBench(name, tasks, options) {
+		log('----- Running ' + name + ' benchmark...')
+		var bench = new Bench(options)
+		var opsByName = {}
+	for (var i = 0; i < tasks.length; i++) {
+		bench.add(tasks[i].name, tasks[i].fn)
+		opsByName[tasks[i].name] = tasks[i].ops || 1
+	}
+		await bench.run()
+
+		var completed = bench.tasks.filter(function (task) {
+			return task.result.state === 'completed'
+		})
+		bench.tasks.forEach(function (task) {
+			log(formatTask(task, opsByName[task.name]))
+		})
+		if (completed.length > 1) {
+			completed.sort(function (a, b) {
+				return b.result.throughput.mean * opsByName[b.name] - a.result.throughput.mean * opsByName[a.name]
+			})
+			var fastest = completed[0]
+			var slowest = completed[completed.length - 1]
+			var ratio =
+			Math.round(
+				((fastest.result.throughput.mean * opsByName[fastest.name]) /
+					(slowest.result.throughput.mean * opsByName[slowest.name])) *
+					100,
+			) / 100
+			log('Fastest is ' + fastest.name + ' (± ' + ratio + 'x faster)')
+		}
+		return bench
+	}
+
+	await runBench('creation', [
+		{name: 'Cassowary.js', fn: createCassowarySolver},
+		{name: 'kiwi', fn: createKiwiSolver},
+		{name: 'kiwi new API', fn: createKiwiSolverNewAPI},
+	])
+
+	await runBench('solving', [
+		{name: 'Cassowary.js', fn: solveCassowary},
+		{name: 'kiwi suggestValue', fn: solveKiwi},
+		{name: 'kiwi updateConstantTo', fn: solveKiwi2},
+	])
+
+	// Le web worker n'est disponible que dans un navigateur cross-origin isolated (SharedArrayBuffer + Atomics).
+	var workerSupported = typeof window !== 'undefined' && globalThis.crossOriginIsolated === true
+	if (workerSupported) {
+		var workerData = createKiwiSolverWorker()
+		// Échauffement : on attend que le worker ait traité la phase de création avant de mesurer.
+		await new Promise(function (resolve) {
+			workerData.solver.time(function () {
+				resolve()
+			})
+		})
+		var WORKER_BATCH = 1000 // séquences par exécution
+		var workerBench = await runBench('solving worker', [
+			{
+				name: 'kiwi worker (' + WORKER_BATCH + ' sequences per run, first in -> last out)',
+				ops: WORKER_BATCH, // 1 op = 1 séquence, comme pour les autres lignes
+				fn: function () {
+					return solveKiwiWorker(workerData, WORKER_BATCH)
+				},
+			},
+		])
+		logWorkerStats(workerBench.tasks[0], WORKER_BATCH)
+	} else {
+		log('----- Skipping web worker benchmark (needs a cross-origin isolated browser page)')
+	}
 }

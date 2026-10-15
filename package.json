@@ -25,7 +25,6 @@
 	],
 	"// Note, we pinned jsdoc to 3.6.1 to prevent an in-range breaking change, https://github.com/jsdoc/jsdoc/issues/1977": "",
 	"devDependencies": {
-		"benchmark": "^2.1.4",
 		"cassowary": "0.0.2",
 		"chai": "^4.2.0",
 		"codecov": "^3.5.0",
@@ -39,6 +38,7 @@
 		"rollup": "^4.22.5",
 		"rollup-plugin-typescript2": "^0.37.0",
 		"rollup-plugin-web-worker-loader": "^1.7.0",
+		"tinybench": "^6.2.2",
 		"typescript": "^6.0.3"
 	},
 	"scripts": {
