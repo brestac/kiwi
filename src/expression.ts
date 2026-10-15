@@ -191,6 +191,8 @@ export class Expression {
   private _constant: number
 }
 
+Variable._Expression = Expression
+
 /**
  * An internal interface for the argument parse results.
  */

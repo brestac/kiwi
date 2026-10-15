@@ -1,4 +1,15 @@
-import {Expression} from './expression.js'
+import type {Expression} from './expression.js'
+
+/**
+ * Constructeur de Expression, enregistré par expression.ts à son chargement (`Variable._Expression`).
+ * Variable n'importe pas Expression à l'exécution : cela évite le cycle variable <-> expression.
+ * @private
+ */
+function newExpression(...args: any[]): Expression {
+  const ctor = Variable._Expression
+  if (ctor === undefined) throw new Error('Expression is not registered: import kiwi from its entry point')
+  return new ctor(...args)
+}
 
 export type Callback = (value: number, previousValue: number) => void
 /**
@@ -100,7 +111,7 @@ export class Variable {
    * @return {Expression} expression
    */
   public plus(value: number | Variable | Expression): Expression {
-    return new Expression(this, value)
+    return newExpression(this, value)
   }
 
   /**
@@ -111,7 +122,7 @@ export class Variable {
    * @return {Expression} expression
    */
   public minus(value: number | Variable | Expression): Expression {
-    return new Expression(this, typeof value === 'number' ? -value : [-1, value])
+    return newExpression(this, typeof value === 'number' ? -value : [-1, value])
   }
 
   /**
@@ -121,7 +132,7 @@ export class Variable {
    * @return {Expression} expression
    */
   public multiply(coefficient: number): Expression {
-    return new Expression([coefficient, this])
+    return newExpression([coefficient, this])
   }
 
   /**
@@ -131,7 +142,7 @@ export class Variable {
    * @return {Expression} expression
    */
   public divide(coefficient: number): Expression {
-    return new Expression([1 / coefficient, this])
+    return newExpression([1 / coefficient, this])
   }
 
   /**
@@ -184,6 +195,9 @@ export class Variable {
     const owner = this._context?.owner
     return '[' + (owner ? (owner + '.') : '') + this._name + ':' + this._value + ']'
   }
+
+  /** @private Renseigné par expression.ts. */
+  static _Expression: (new (...args: any[]) => Expression) | undefined = undefined
 
   private _name: string
   private _value: number = 0.0
