@@ -13,7 +13,8 @@ import type { SolverInterface } from './worker/solverinterface.js'
  */
  export interface SolverOptions {
   worker?: boolean,
-  floatPrecision?: number
+  floatPrecision?: number,
+  refreshRate?: number
 }
 
 export class Solver {
@@ -28,7 +29,7 @@ export class Solver {
 	 * importé par le worker (SolverWorker), et importer SolverInterface (qui importe le worker) créerait un cycle.
 	 * @private
 	 */
-	static workerFactory: (() => SolverInterface) | undefined = undefined
+  static workerFactory: ((options?: any) => SolverInterface) | undefined = undefined
 
 	static create(options: SolverOptions = {}): Solver | SolverInterface {
     if (options?.worker == true) {
@@ -38,7 +39,7 @@ export class Solver {
       if (!Solver.workerFactory) {
         throw new Error('Option worker=true. Worker support is not registered: import Solver from the package entry point.')
       }
-      return Solver.workerFactory()
+      return Solver.workerFactory(options)
     } else {
       return new Solver()
     }

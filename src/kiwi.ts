@@ -10,4 +10,4 @@ import { SolverInterface } from './worker/solverinterface.js'
 
 export type { SolverInterface }
 
-Solver.workerFactory = () => new SolverInterface()
+Solver.workerFactory = (options?: any) => new SolverInterface(options)

@@ -7,8 +7,6 @@ import { Variable } from '../variable.js'
 import { SolverCommand } from './solvercommand.js'
 import { CommandConsumer, NO_COMMAND } from './commandqueue.js'
 
-const UPDATE_INTERVAL_MS = 16
-
 export class SolverWorker extends Solver {
   private _commands: CommandConsumer
   private _output: Int32Array
@@ -93,22 +91,22 @@ export class SolverWorker extends Solver {
     return this._varMap.array[i]?.first
   }
 
-  public run() : void {
-  	while (true) {
-  		let type: number
+  public run(updatesMs: number) : void {
+    while (true) {
+      let type: number
       if (this._needsUpdateVariables) {
-  			const now = performance.now()
-  			if (now >= this._lastUpdate + UPDATE_INTERVAL_MS) this.flushVariables(now) // échéance atteinte (ou worker inactif : latence minimale)
-  		}
+        const now = performance.now()
+        if (now >= this._lastUpdate + updatesMs) this.flushVariables(now) // échéance atteinte (ou worker inactif : latence minimale)
+      }
       if (this._needsUpdateVariables) {
-  			// Mise à jour en attente : on ne dort pas plus longtemps que la prochaine échéance.
-  			type = this._commands.next(Math.max(0, this._lastUpdate + UPDATE_INTERVAL_MS - performance.now()))
-  			if (type === NO_COMMAND) continue // l'échéance est passée : le haut de la boucle fait la mise à jour
-  		} else {
-  			type = this._commands.next()
-  		}
-  		this.handleCommand(type)
-  	}
+        // Mise à jour en attente : on ne dort pas plus longtemps que la prochaine échéance.
+        type = this._commands.next(Math.max(0, this._lastUpdate + updatesMs - performance.now()))
+        if (type === NO_COMMAND) continue // l'échéance est passée : le haut de la boucle fait la mise à jour
+      } else {
+        type = this._commands.next()
+      }
+      this.handleCommand(type)
+    }
   }
 
   private flushVariables(now: number): void {
@@ -142,7 +140,7 @@ export class SolverWorker extends Solver {
   			break
   		}
   		case SolverCommand.UPDATE_VARIABLES:
-        this._needsUpdateVariables = true // exécuté par run(), au plus une fois par UPDATE_INTERVAL_MS
+        this._needsUpdateVariables = true // exécuté par run(), au plus une fois par refreshRate
   			break
   		case SolverCommand.ADD_EDIT_VARIABLE: {
   			const id = payload.at(0) as number

@@ -16,7 +16,7 @@ export class SolverInterface {
 	private _timeSeq: Int32Array
 	private _timeVal: Float64Array
 
-  constructor() {
+	constructor(options? : any) {
 		this._worker = new MyWorker()
 
 		const sharedOutputBuffer = new SharedArrayBuffer(512, { maxByteLength: Math.pow(2, 20) })
@@ -32,19 +32,12 @@ export class SolverInterface {
 		this._worker.postMessage({
 			type: SolverCommand.INIT,
 			data: { input: inputBuffer, output: this._sharedOuputArray, time: timeBuffer },
+			options
 		})
 
-		// this._worker.onmessage = (event: any) => {
-		// 	const { type, data } = event.data
-		//
-		// 	switch (type) {
-		// 		case SolverCommand.AKNOWLEDGE:
-		// 			console.log(data)
-		// 			break;
-		// 		default:
-		// 			break;
-		// 	}
-		// }
+		this._worker.onmessage = (event: any) => {		
+			console.log(event.data)
+		}
 	}
 
   public sendCommand(type: number, payload: ArrayLike<number> = []): void {
