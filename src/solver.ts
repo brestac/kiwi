@@ -137,6 +137,22 @@ export class Solver {
 		if (shouldOptimize) this._optimize(this._objective)
 	}
 
+	public addConstraints(constraints: Constraint[]) : void {
+		for (let i = 0; i < constraints.length; i++) {
+			this.addConstraint(constraints[i], false)
+		}
+
+		this._optimize(this._objective)
+	}
+
+	public removeConstraints(constraints: Constraint[]) : void {
+		for (let i = 0; i < constraints.length; i++) {
+			this.removeConstraint(constraints[i], false)
+		}
+
+		this._optimize(this._objective)
+	}
+
 	/**
 	 * Update the strength of a non-required constraint already present
 	 * in the solver, without removing and re-adding it.
