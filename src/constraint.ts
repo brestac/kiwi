@@ -141,7 +141,7 @@ export class Constraint {
 
   public toBinary(callback: ((variable: Variable) => void) | undefined) : Int32Array {
     if (callback !== undefined) {
-      this._expression.terms().array.forEach(({first: variable}: any) => callback(variable)
+      this._expression.terms().array.forEach(({first: variable}: any) => callback(variable))
     }
 
     const exp = this._expression.toBinary()
