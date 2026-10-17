@@ -64,7 +64,7 @@ export class SolverWorker extends Solver {
 
       if (size > this._output.length) {
         let buffer = this._output.buffer as SharedArrayBuffer
-        buffer.grow(size * this._output.BYTES_PER_ELEMENT)
+        buffer.grow(size * Int32Array.BYTES_PER_ELEMENT)
       }
 
       this._output[key._sharedOutputIndex] = key.value()

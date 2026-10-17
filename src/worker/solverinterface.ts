@@ -37,8 +37,8 @@ export class SolverInterface {
 			options
 		})
 
-		this._worker.onmessage = (event: any) => {		
-			console.log(event.data)
+		this._worker.onmessage = (event: any) => {
+			console.log(`%c ${event.data}`, 'font-family:monospace;font-size:18px;color:red;font-weight:bold')
 		}
 	}
 
