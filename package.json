@@ -35,10 +35,12 @@
 		"prettier": "3.0.3",
 		"rimraf": "^3.0.2",
 		"rollup": "4.1.4",
+		"rollup-plugin-typescript2": "^0.37.0",
 		"typescript": "^6.0.3"
 	},
 	"scripts": {
 		"build": "tsc",
+		"build-umd": "rollup -c rollup.umd.config.js",
 		"clean": "rimraf dist/ tmp/",
 		"test": "tsc && mocha test/main.js",
 		"format": "npm run prettier",
