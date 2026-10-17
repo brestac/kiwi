@@ -635,16 +635,17 @@ describe('import kiwi', function () {
 					const x = new kiwi.Variable("x")
 					const expected = [100, 50, 60]
 					let result = []
-					let compare = (a,b) => a.length == b.length && a.every(i => b.includes(i))
 
 					x.subscribe((value, prev) => {
 						result.push(value)
 
 						if (result.length == expected.length) {
-							if (compare(expected, result)) {
+							const equals = result.every(i => expected.includes(i))
+
+							if (equals) {
 								done()
 							} else {
-								done(new Error(`expected values == ${expected_constants}, was ${result}`))
+								done(new Error(`expected values == ${expected}, was ${result}`))
 							}
 						}
 					})

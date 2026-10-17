@@ -139,7 +139,11 @@ export class Constraint {
     return constraint
   }
 
-  public toBinary() : Int32Array {
+  public toBinary(callback: ((variable: Variable) => void) | undefined) : Int32Array {
+    if (callback !== undefined) {
+      this._expression.terms().array.forEach(({first: variable}: any) => callback(variable)
+    }
+
     const exp = this._expression.toBinary()
     const strength = this._strength.toBinary()
     const size = exp.length + strength.length + 3 // the full size of the packed array, including the size number

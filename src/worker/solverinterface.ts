@@ -80,34 +80,22 @@ export class SolverInterface {
 
 	public addConstraints(constraints: Constraint[]): void {
 
-		let payload = new Int32Array(COMMAND_DATA_LENGTH)
-		let offset = 0
+		const payload = constraints.reduce((data:number[], constraint: Constraint) => {
+			const constraint_data = constraint.toBinary((variable: Variable) => {
+				if (variable._sharedOutputIndex === -1) {
+					if (variable._callback !== undefined) {
+						variable._notify = 1
+						watchValue(this._sharedOuputArray, this._sharedOutputIndex, variable._callback)
+					}
 
-		constraints.forEach(constraint => {
-      constraint.expression().terms().array.forEach(({first: variable}: any) => {
-
-        if (variable._sharedOutputIndex === -1) {
-          if (variable._callback !== undefined) {
-            variable._notify = 1
-            watchValue(this._sharedOuputArray, this._sharedOutputIndex, variable._callback)
-          }
-
-          variable._sharedOutputIndex = this._sharedOutputIndex++
-        }
+					variable._sharedOutputIndex = this._sharedOutputIndex++
+				}
 			})
 
-			const constraint_data = constraint.toBinary()
+			return [...data, ...constraint_data]
+		}, [])
 
-			if (offset + constraint_data.length > COMMAND_DATA_LENGTH) {
-				this.sendCommand(SolverCommand.ADD_CONSTRAINTS, payload.slice(0, offset))
-				offset = 0
-			}
-
-			payload.set(constraint_data, offset)
-			offset += constraint_data.length
-		})
-
-		this.sendCommand(SolverCommand.ADD_CONSTRAINTS, payload.slice(0, offset))
+		this.sendCommand(SolverCommand.ADD_CONSTRAINTS, payload)
 	}
 
 	public removeConstraint(constraint: Constraint): void {
