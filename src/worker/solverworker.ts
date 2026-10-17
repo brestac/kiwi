@@ -170,10 +170,11 @@ export class SolverWorker extends Solver {
   }
 
   private addConstraintsFromBinary(data: Int32Array, size: number): void {
-  	let offset = 0
+    let n_csts = data.at(0) as number
+    let offset = 1
 
   	while (offset < size) {
-  		const cst_size = (data.at(offset) as number) + 1
+  		const cst_size = (data.at(offset) as number)
   		const constraint = Constraint.fromBinary(data.slice(offset, offset + cst_size))
   		super.addConstraint(constraint, false)
   		offset += cst_size
