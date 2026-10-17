@@ -43,6 +43,7 @@
 	},
 	"scripts": {
 		"build": "rollup -c",
+		"build-umd": "rollup -c rollup.umd.config.js",
 		"clean": "rimraf dist/ tmp/",
 		"test": "rollup -c && mocha test/main.js",
 		"format": "npm run prettier",
