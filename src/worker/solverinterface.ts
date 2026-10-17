@@ -7,6 +7,8 @@ import { SolverCommand } from './solvercommand.js'
 import MyWorker from 'web-worker:./worker'
 import { CommandProducer, createCommandBuffer } from './commandqueue.js'
 
+const COMMAND_DATA_LENGTH = 1 << 16
+
 export class SolverInterface {
 	private _worker: Worker
 	private _commands: CommandProducer
@@ -22,7 +24,7 @@ export class SolverInterface {
 		const sharedOutputBuffer = new SharedArrayBuffer(512, { maxByteLength: Math.pow(2, 20) })
 		this._sharedOuputArray = new Int32Array(sharedOutputBuffer)
 
-    const inputBuffer = createCommandBuffer() // 65 536 words by default
+    const inputBuffer = createCommandBuffer(COMMAND_DATA_LENGTH) // 65 536 words by default
 		this._commands = new CommandProducer(inputBuffer)
 
 		const timeBuffer = new SharedArrayBuffer(16)
@@ -78,7 +80,8 @@ export class SolverInterface {
 
 	public addConstraints(constraints: Constraint[]): void {
 
-		let payload: Array<number> = []
+		let payload = new Int32Array(COMMAND_DATA_LENGTH)
+		let offset = 0
 
 		constraints.forEach(constraint => {
       constraint.expression().terms().array.forEach(({first: variable}: any) => {
@@ -93,11 +96,18 @@ export class SolverInterface {
         }
 			})
 
-			const binary_cst = constraint.toBinary()
-			payload = [...payload, ...binary_cst]
+			const constraint_data = constraint.toBinary()
+
+			if (offset + constraint_data.length > COMMAND_DATA_LENGTH) {
+				this.sendCommand(SolverCommand.ADD_CONSTRAINTS, payload.slice(0, offset))
+				offset = 0
+			}
+
+			payload.set(constraint_data, offset)
+			offset += constraint_data.length
 		})
 
-		this.sendCommand(SolverCommand.ADD_CONSTRAINTS, payload)
+		this.sendCommand(SolverCommand.ADD_CONSTRAINTS, payload.slice(0, offset))
 	}
 
 	public removeConstraint(constraint: Constraint): void {
