@@ -144,8 +144,18 @@ export class SolverInterface {
 		}
 	}
 
-	public valueOfVariable(variable: Variable): number | bigint | undefined {
-		return (variable._sharedOutputIndex >= 0) ? Atomics.load(this._sharedOuputArray, variable._sharedOutputIndex) : undefined
+	public valueOfVariable(variable: Variable): bigint | number {
+		const index = variable._sharedOutputIndex
+		if (index < 0 || index >= this._sharedOuputArray.length) {
+			throw new Error(`Invalid Atomics access index ${index} out of bounds [0-${this._sharedOuputArray.length}]`)
+		}
+
+		return Atomics.load(this._sharedOuputArray, index)
+	}
+
+	public getConstraints() : Constraint[] {
+		console.warn("Solver getConstraints() is not implemented in worker mode")
+		return []
 	}
 
 	public time(callback: (date: number) => void) {
