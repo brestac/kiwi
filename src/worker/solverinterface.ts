@@ -76,7 +76,7 @@ export class SolverInterface {
 		this.addConstraints([constraint])
 	}
 
-	public addConstraints(constraints: [Constraint]): void {
+	public addConstraints(constraints: Constraint[]): void {
 
 		let payload: Array<number> = []
 
@@ -104,7 +104,7 @@ export class SolverInterface {
 		this.removeConstraints([constraint])
 	}
 
-	public removeConstraints(constraints: [Constraint]): void {
+	public removeConstraints(constraints: Constraint[]): void {
 		const payload = constraints.map(cst => cst.id())
 		this.sendCommand(SolverCommand.REMOVE_CONSTRAINTS, payload)
 	}

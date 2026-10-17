@@ -160,7 +160,7 @@ export class Solver {
 		if (shouldOptimize) this._optimize(this._objective)
 	}
 
-	public addConstraints(constraints: [Constraint]) : void {
+	public addConstraints(constraints: Constraint[]) : void {
 		for (let i = 0; i < constraints.length; i++) {
 			this.addConstraint(constraints[i], false)
 		}
@@ -168,7 +168,7 @@ export class Solver {
 		this._optimize(this._objective)
 	}
 
-	public removeConstraints(constraints: [Constraint]) : void {
+	public removeConstraints(constraints: Constraint[]) : void {
 		for (let i = 0; i < constraints.length; i++) {
 			this.removeConstraint(constraints[i], false)
 		}
