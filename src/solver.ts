@@ -123,8 +123,10 @@ export class Solver {
 				throw new Error('failed to find leaving row')
 			}
 			rowPair = this._rowMap.erase(leaving)
-			rowPair.second.solveForEx(leaving, marker)
-			this._substitute(marker, rowPair.second)
+			if (rowPair !== undefined) {
+				rowPair.second.solveForEx(leaving, marker)
+				this._substitute(marker, rowPair.second)
+			}
 		}
 
 		// Optimizing after each constraint is removed ensures that the
@@ -170,9 +172,11 @@ export class Solver {
 		let expr = new Expression(variable)
 		let cn = new Constraint(expr, Operator.Eq, undefined, strength)
 		this.addConstraint(cn)
-		let tag = this._cnMap.find(cn).second
-		let info = {tag, constraint: cn, constant: 0.0}
-		this._editMap.insert(variable, info)
+		let pair = this._cnMap.find(cn)
+		if (pair !== undefined) {
+			let info = {tag: pair.second, constraint: cn, constant: 0.0}
+			this._editMap.insert(variable, info)
+		}
 	}
 
 	/**
@@ -415,7 +419,7 @@ export class Solver {
 		// only if the artificial objective is optimized to zero.
 		this._optimize(this._artificial)
 		let success = nearZero(this._artificial.constant())
-		this._artificial = null
+		this._artificial = undefined
 
 		// If the artificial variable is basic, pivot the row so that
 		// it becomes non-basic. If the row is constant, exit early.
@@ -487,7 +491,10 @@ export class Solver {
 				throw new Error('the objective is unbounded')
 			}
 			// pivot the entering symbol into the basis
-			let row = this._rowMap.erase(leaving).second
+			let row = this._rowMap.erase(leaving)?.second
+			if (row == undefined) {
+				throw new Error('_optimize error')
+			}
 			row.solveForEx(leaving, entering)
 			this._substitute(entering, row)
 			this._rowMap.insert(entering, row)
@@ -512,6 +519,9 @@ export class Solver {
 		let infeasible = this._infeasibleRows
 		while (infeasible.length !== 0) {
 			let leaving = infeasible.pop()
+			if (leaving == undefined) {
+				throw new Error('_dualOptimize failed')
+			}
 			let pair = rows.find(leaving)
 			if (pair !== undefined && pair.second.constant() < 0.0) {
 				let entering = this._getDualEnteringSymbol(pair.second)
@@ -738,7 +748,7 @@ export class Solver {
 	private _editMap = createEditMap()
 	private _infeasibleRows: Symbol[] = []
 	private _objective: Row = new Row()
-	private _artificial: Row = null
+	private _artificial: Row | undefined = undefined
 	private _idTick: number = 0
 }
 
@@ -990,6 +1000,9 @@ class Row {
 	public solveFor(symbol: Symbol): void {
 		let cells = this._cellMap
 		let pair = cells.erase(symbol)
+		if (pair == undefined) {
+			throw new Error('solveFor failed')
+		}
 		let coeff = -1.0 / pair.second
 		this._constant *= coeff
 		for (let i = 0, n = cells.size(); i < n; ++i) {
