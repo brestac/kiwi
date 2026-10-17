@@ -179,6 +179,11 @@ export class SolverInterface {
 }
 
 function watchValue(typedArray: Int32Array, index: number, callback: Callback) {
+
+	if (index >= typedArray.length) {
+		let buffer = typedArray.buffer as SharedArrayBuffer
+		buffer.grow((typedArray.length + 128) * Int32Array.BYTES_PER_ELEMENT)
+	}
 	// Charger la valeur actuelle
 	let currentVal = Atomics.load(typedArray, index)
 
