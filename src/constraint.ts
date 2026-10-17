@@ -159,8 +159,8 @@ export class Constraint {
     const size = data.at(0) as number
     const id = data.at(1) as number
     const operator = data.at(2) as number
-    const strength = SymbolicWeight.fromBinary(data.slice(3, 5))
-    const expression = Expression.fromBinary(data.slice(5, size))
+    const strength = SymbolicWeight.fromBinary(data.slice(3, 3 + LEVEL_COUNT))
+    const expression = Expression.fromBinary(data.slice(3 + LEVEL_COUNT, size))
 
     let constraint = new Constraint(expression, operator, undefined, strength)
     constraint._id = id

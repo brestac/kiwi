@@ -1,6 +1,6 @@
 import { Solver, Symbol, SymbolType } from '../solver.js'
 import { Constraint } from '../constraint.js'
-import { SymbolicWeight } from '../symbolicweight.js'
+import { SymbolicWeight, LEVEL_COUNT } from '../symbolicweight.js'
 import { IMap, Pair } from '../maptype.js'
 import { Variable } from '../variable.js'
 
@@ -135,7 +135,7 @@ export class SolverWorker extends Solver {
   			break
   		case SolverCommand.UPDATE_STRENGTH: {
   			const id = payload.at(0) as number
-  			const strength = SymbolicWeight.fromBinary(payload.slice(1, 2))
+        const strength = SymbolicWeight.fromBinary(payload.slice(1, 1 + LEVEL_COUNT))
   			super._updateStrengthToById(id, strength)
   			break
   		}
@@ -144,7 +144,7 @@ export class SolverWorker extends Solver {
   			break
   		case SolverCommand.ADD_EDIT_VARIABLE: {
   			const id = payload.at(0) as number
-  			const strength = SymbolicWeight.fromBinary(payload.slice(1, this._commands.size))
+  			const strength = SymbolicWeight.fromBinary(payload.slice(1, 1 + LEVEL_COUNT))
         this._addEditVariable(id, strength)
   		}
   			break

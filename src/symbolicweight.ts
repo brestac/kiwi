@@ -158,32 +158,23 @@ export class SymbolicWeight {
     return '(' + this._levels.join(', ') + ')'
   }
 
-  public toJSON() : Uint32Array {
+  public toJSON() : any {
     return this._levels
   }
 
   static fromJSON(levels: any) {
-    return new SymbolicWeight(levels)
+    return new SymbolicWeight(levels as Uint32Array)
   }
 
   public toBinary() : Int32Array {
-    const level = this._levels.findIndex(i => i !== 0)
-
-    if (level === -1) {
-      throw new Error('SymbolicWeight toBinary() : invalid levels ' + this._levels)
-    }
-
-    const weight = this._levels[level]
-
-    return new Int32Array([level, weight])
+    return new Int32Array(this._levels)
   }
 
   static fromBinary(data: Int32Array) {
-    if (data.length < 2) {
+    if (data.length !== LEVEL_COUNT) {
       throw new Error('SymbolicWeight.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
     }
 
-    const [level, weight] = data
-    return SymbolicWeight.create(level, weight)
+    return new SymbolicWeight(data as any as Uint32Array)
   }
 }
