@@ -159,9 +159,9 @@ export class Expression {
 
   public toBinary(): Int32Array {
     const terms_array = this._terms.array.reduce((prev: any, pair: any) => {
-      const variable = pair.first.toBinary()
+      const variable_data = pair.first.toBinary()
       const coefficient = pair.second
-      return [...prev, ...variable, coefficient]
+      return [...prev, ...variable_data, coefficient]
     }, [])
 
     const nterms = this._terms.array.length
@@ -169,20 +169,30 @@ export class Expression {
   }
 
   static fromBinary(data: Int32Array) {
-    let terms = createMap<Variable, number>()
-    let nterms = data.at(0) as number
+    // if (data.length < 6) {
+    //   throw new Error('Expression.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
+    // }
 
-    for (let i = 1; i < nterms * 5 + 1; i+=5) {
-      let variable_data = data.slice(i, i + 4)
-      let variable = Variable.fromBinary(variable_data)
-      let coefficient = data.at(i + 4) as number
+    const nterms = data.at(0) as number
+
+    let terms = createMap<Variable, number>()
+    let offset = 1
+    let n = 0
+
+    while (n < nterms && offset < data.length) {
+      const variable_data_size = data.at(offset) as number
+      const variable_data = data.slice(offset, offset + variable_data_size)
+      const variable = Variable.fromBinary(variable_data)
+      const coefficient = data.at(offset + variable_data_size) as number
 
       terms.insert(variable, coefficient)
+      offset += variable_data_size + 1
+      n++
     }
 
     let expression = new Expression()
     expression._terms = terms
-    expression._constant = data.at(-1) as number
+    expression._constant = data.at(offset) as number
 
     return expression
   }

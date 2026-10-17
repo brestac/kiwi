@@ -168,12 +168,21 @@ export class SymbolicWeight {
 
   public toBinary() : Int32Array {
     const level = this._levels.findIndex(i => i !== 0)
+
+    if (level === -1) {
+      throw new Error('SymbolicWeight toBinary() : invalid levels ' + this._levels)
+    }
+
     const weight = this._levels[level]
 
     return new Int32Array([level, weight])
   }
 
   static fromBinary(data: Int32Array) {
+    if (data.length < 2) {
+      throw new Error('SymbolicWeight.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
+    }
+
     const [level, weight] = data
     return SymbolicWeight.create(level, weight)
   }

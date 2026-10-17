@@ -173,20 +173,25 @@ export class Variable {
   }
 
   public toBinary(): Int32Array {
+    //const context : number[] = (isNumberArray(this._context) || isTypedArray(this._context, 4)) ? this._context : []
+    //const size = context.length + 5
     return new Int32Array([
+      5,//size,
       this._id,
       this._value,
       this._sharedOutputIndex,
-      this._notify
+      this._notify,
+      //...context
     ])
   }
 
   static fromBinary(data: Int32Array) : Variable {
     let variable = new Variable()
-    variable._id = data.at(0) as number
-    variable._value = data.at(1) as number
-    variable._sharedOutputIndex = data.at(2) as number
-    variable._notify = data.at(3) as number
+    variable._id = data.at(1) as number
+    variable._value = data.at(2) as number
+    variable._sharedOutputIndex = data.at(3) as number
+    variable._notify = data.at(4) as number
+    //if (data.at(0) > 5) variable._context = data.slice(5, data.at(0))
 
     return variable
   }
@@ -213,3 +218,12 @@ export class Variable {
  * @private
  */
 let VarId = 0
+/*
+function isNumberArray(value: any): boolean {
+  return Array.isArray(value) && value.every(item => typeof item === 'number')
+}
+
+function isTypedArray(value: any, maxByteLength: number): boolean {
+  return ArrayBuffer.isView(value) && 'BYTES_PER_ELEMENT' in value && (value.BYTES_PER_ELEMENT as number) <= maxByteLength
+}
+*/
