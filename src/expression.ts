@@ -116,16 +116,16 @@ export class Expression {
 
 	public toString(): string {
 		let result = this._terms.array
-			.map(function (pair) {
-				return pair.second + '*' + pair.first.toString()
-			})
-			.join(' + ')
+			.reduce((prev: string, pair: Pair<Variable, number>, idx: number) => {
+				const coeff = ((Math.abs(pair.second) == 1.0) ? '' : Math.abs(pair.second) + ' * ')
+				const sign = (pair.second >= 0) ? (idx === 0 ? '' : ' + ') : ' - '
+				const next = sign + coeff + pair.first.toString()
+				return prev + next
+			}, "")
 
-		if (!this.isConstant() && this._constant !== 0) {
-			result += ' + '
+		if (this._constant !== 0) {
+			result += ((this._constant > 0) ? (result.length === 0 ? '' : ' + ') : ' - ') + Math.abs(this._constant)
 		}
-
-		result += this._constant
 
 		return result
 	}
