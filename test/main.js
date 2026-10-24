@@ -11,6 +11,172 @@ describe('import kiwi', function () {
 				var solver = new kiwi.Solver()
 				assert(solver)
 			})
+
+			describe('toJSON', function () {
+				it('constraint', function () {
+					var x = new kiwi.Variable("left")
+					x.setValue(100)
+					x.setContext({ owner: "truc" })
+
+					var constraint1 = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+					var json_constraint = constraint1.toJSON()
+					var constraint2 = kiwi.Constraint.fromJSON(json_constraint)
+					assert.equal(constraint1.toString(), constraint2.toString())
+				})
+			})
+
+			describe('Binary encoding', function () {
+				it('variable', function () {
+					var x = new kiwi.Variable()
+					x.setValue(100)
+
+					var encoded = x.toBinary()
+					var decoded = kiwi.Variable.fromBinary(encoded)
+					assert.equal(x.toString(), decoded.toString())
+				})
+
+				it('variable with name, owner', function () {
+					kiwi.Variable.debug = true
+					var x = new kiwi.Variable()
+					x.setName('toto')
+					x.setOwner('tata')
+					x.setValue(100)
+
+					var encoded = x.toBinary()
+					var decoded = kiwi.Variable.fromBinary(encoded)
+					assert.equal(x.toString(), decoded.toString())
+					kiwi.Variable.debug = false
+				})
+
+				it('variable debug', function () {
+					kiwi.Variable.debug = true
+					var x = new kiwi.Variable()
+					x.setValue(100)
+
+					var encoded = x.toBinary()
+					var decoded = kiwi.Variable.fromBinary(encoded)
+					assert.equal(x.toString(), decoded.toString())
+					kiwi.Variable.debug = false
+				})
+
+				it('variable debug with name, owner', function () {
+					kiwi.Variable.debug = true
+					var x = new kiwi.Variable()
+					x.setName('toto')
+					x.setOwner('tata')
+					x.setValue(100)
+
+					var encoded = x.toBinary()
+					var decoded = kiwi.Variable.fromBinary(encoded)
+					assert.equal(x.toString(), decoded.toString())
+					assert.equal(decoded.name(), 'toto')
+					assert.equal(decoded.owner(), 'tata')
+
+					kiwi.Variable.debug = false
+				})
+
+				it('variable debug with name only', function () {
+					kiwi.Variable.debug = true
+					var x = new kiwi.Variable()
+					x.setName('toto')
+					x.setValue(100)
+
+					var encoded = x.toBinary()
+					var decoded = kiwi.Variable.fromBinary(encoded)
+					assert.equal(x.toString(), decoded.toString())
+					assert.equal(decoded.name(), 'toto')
+					assert.equal(decoded.owner(), undefined)
+
+					kiwi.Variable.debug = false
+				})
+
+				it('variable debug with owner only', function () {
+					kiwi.Variable.debug = true
+					var x = new kiwi.Variable()
+					x.setOwner('tata')
+					x.setValue(100)
+
+					var encoded = x.toBinary()
+					var decoded = kiwi.Variable.fromBinary(encoded)
+					assert.equal(x.toString(), decoded.toString())
+					assert.equal(decoded.name(), '')
+					assert.equal(decoded.owner(), 'tata')
+
+					kiwi.Variable.debug = false
+				})
+
+				it('expression', function () {
+					var x = new kiwi.Variable()
+					x.setValue(100)
+
+					var exp = new kiwi.Expression(x, 100)
+					var encoded = exp.toBinary()
+					var decoded = kiwi.Expression.fromBinary(encoded)
+
+					assert.equal(exp.toString(), decoded.toString())
+
+					var exp2 = new kiwi.Expression(x, 100, exp)
+					var encoded2 = exp2.toBinary()
+					var decoded2 = kiwi.Expression.fromBinary(encoded2)
+
+					assert.equal(exp2.toString(), decoded2.toString())
+				})
+
+				it('constraint', function () {
+					var x = new kiwi.Variable()
+					x.setValue(100)
+
+					var constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+					var encoded = constraint.toBinary()
+					var decoded = kiwi.Constraint.fromBinary(encoded)
+					assert.equal(constraint.toString(), decoded.toString())
+				})
+
+				it('constraint debug', function () {
+					kiwi.Variable.debug = true
+					var x = new kiwi.Variable()
+					x.setName('toto')
+					x.setOwner('tata')
+					x.setValue(100)
+
+					var constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+					var encoded = constraint.toBinary()
+					var decoded = kiwi.Constraint.fromBinary(encoded)
+					assert.equal(constraint.toString(), decoded.toString())
+					kiwi.Variable.debug = false
+				})
+
+				it('constraints', function () {
+					var x = new kiwi.Variable()
+					x.setValue(100)
+
+					var y = new kiwi.Variable()
+					y.setValue(50)
+
+					var constraint1 = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+					var constraint2 = new kiwi.Constraint(y, kiwi.Operator.Le, 50, kiwi.Strength.strong)
+					var constraints = [constraint1, constraint2]
+
+					var encoded_array = constraints.reduce((prev, curr) => {
+						return [...prev, ...(curr.toBinary())]
+					}, [])
+					var encoded = new Int32Array(encoded_array)
+
+					let decoded = []
+					let offset = 0
+					while (offset < encoded.length) {
+						const size = encoded.at(offset)
+						const constraint = kiwi.Constraint.fromBinary(encoded.slice(offset, offset + size))
+						decoded.push(constraint)
+						offset += size
+					}
+
+					let desc1 = constraints.map(cst => cst.toString()).join(",")
+					let desc2 = decoded.map(cst => cst.toString()).join(",")
+					assert.equal(desc1, desc2)
+				})
+
+			})
 		})
 
 		describe('Variable', function () {

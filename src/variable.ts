@@ -161,9 +161,85 @@ export class Variable {
 	 */
 	public toJSON(): any {
 		return {
-			name: this._name,
+			id: this._id,
 			value: this._value,
+			sharedVarIndex: this._sharedOutputIndex,
+			notify: this._notify,
+			name: this._name,
+			context: this._context
 		}
+	}
+
+	static fromJSON(json: any) : Variable {
+		let variable = new Variable()
+		variable._id = json.id
+		variable._value = json.value
+		variable._sharedOutputIndex = json.sharedVarIndex
+		variable._notify = json.notify
+		variable._name = json.name
+		variable._context  = json.context
+
+		return variable
+	}
+
+	public toBinary(): Int32Array {
+		let size = 6
+		let offset = 0
+		let encoded_name : Int32Array = new Int32Array(0)
+		let encoded_owner : Int32Array = new Int32Array(0)
+
+		if (Variable.debug) {
+			encoded_name = stringToInt32Array(this._name)
+			encoded_owner = stringToInt32Array(this._owner)
+			size += 2 + encoded_name.length + encoded_owner.length
+		}
+
+		let data: Int32Array = new Int32Array(size)
+
+		data[offset++] = size
+		data[offset++] = this._id
+		data.set(floatToInt32(this._value), offset)
+		offset += 2
+		data[offset++] = this._sharedOutputIndex
+		data[offset++] = this._notify
+
+		if (Variable.debug) {
+			data[offset++] = encoded_name.length
+			data.set(encoded_name, offset)
+			offset += encoded_name.length
+			data[offset++] = encoded_owner.length
+			data.set(encoded_owner, offset)
+		}
+
+		return data
+	}
+
+	static fromBinary(data: Int32Array) : Variable {
+		let offset = 1
+		let variable = new Variable()
+
+		variable._id = data.at(offset++) as number
+		variable._value = int32ToFloat(data.subarray(offset, offset + 2))
+		offset += 2
+		variable._sharedOutputIndex = data.at(offset++) as number
+		variable._notify = data.at(offset++) as number
+
+		if (Variable.debug) {
+			const name_size = data.at(offset++) as number
+
+			if (name_size > 0) {
+				variable._name = int32ArrayToString(data.slice(offset, offset + name_size)) as string
+				offset += name_size
+			}
+
+			const owner_size = data.at(offset++) as number
+
+			if (owner_size > 0) {
+				variable._owner = int32ArrayToString(data.slice(offset, offset + owner_size)) as string
+			}
+		}
+
+		return variable
 	}
 
 	public toString(): string {
@@ -191,3 +267,51 @@ export class Variable {
  * @private
  */
 let VarId = 0
+
+function stringToInt32Array(str?: string) : Int32Array {
+		if (str == undefined) return new Int32Array(0)
+		// 1. Encoder le string en octets UTF-8 (Uint8Array)
+		const encoder = new TextEncoder();
+		const u8Array = encoder.encode(str);
+
+		// 2. Calculer le nombre d'éléments Int32 nécessaires (arrondi au supérieur)
+		const int32Length = Math.ceil(u8Array.byteLength / 4);
+
+		// 3. Créer un ArrayBuffer aligné sur 4 octets
+		const buffer = new ArrayBuffer(int32Length * 4);
+
+		// 4. Copier les octets du texte dans le buffer
+		new Uint8Array(buffer).set(u8Array);
+
+		// 5. Retourner la vue Int32Array
+		return new Int32Array(buffer);
+}
+
+function int32ArrayToString(int32Array: Int32Array) : string | undefined {
+		if (int32Array.length === 0) return undefined
+
+		const u8Array = new Uint8Array(int32Array.buffer);
+
+		// Partir de la fin pour trouver le dernier octet non nul
+		let end = u8Array.length;
+		while (end > 0 && u8Array[end - 1] === 0) {
+				end--;
+		}
+
+		const decoder = new TextDecoder();
+		return decoder.decode(u8Array.subarray(0, end));
+}
+
+export function floatToInt32(value: number) : Int32Array {
+	const int_value = Math.trunc(value)
+	const dec_value = Math.round((value - Math.trunc(value)) * Math.pow(10, 6))
+
+	return new Int32Array([int_value, dec_value])
+}
+
+export function int32ToFloat(value: Int32Array) : number {
+	const int_value = value.at(0) as number
+	const dec_value = value.at(1) as number
+
+	return Number((int_value + (dec_value / Math.pow(10, 6))).toFixed(6))
+}
