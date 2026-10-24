@@ -307,5 +307,50 @@ describe('import kiwi', function () {
 				assert.equal(bottom.value(), 300)
 			})
 		})
+
+		describe('Symbolic strength ordering (lexicographic, not packed-decimal)', function () {
+			it('1001 weak constraints never outweigh a single medium constraint', function () {
+				// Regression test for the previous packed-number Strength
+				// encoding, under which enough accumulated weak-level
+				// contributions could carry over into the medium digit
+				// place and incorrectly outrank a single medium constraint.
+				var solver = new kiwi.Solver()
+				var x = new kiwi.Variable()
+
+				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium))
+				for (var i = 0; i < 1001; i++) {
+					solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 0, kiwi.Strength.weak))
+				}
+
+				solver.updateVariables()
+				assert.equal(x.value(), 100)
+			})
+
+			it('a single strong constraint always outweighs any number of medium ones', function () {
+				var solver = new kiwi.Solver()
+				var x = new kiwi.Variable()
+
+				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.strong))
+				for (var i = 0; i < 1001; i++) {
+					solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 0, kiwi.Strength.medium))
+				}
+
+				solver.updateVariables()
+				assert.equal(x.value(), 100)
+			})
+
+			it('weight combines additively within a level without crossing into another', function () {
+				var solver = new kiwi.Solver()
+				var x = new kiwi.Variable()
+
+				// A single level-6 constraint with a large weight still
+				// never outweighs a single level-5 (stronger) constraint.
+				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.create(5)))
+				solver.addConstraint(new kiwi.Constraint(x, kiwi.Operator.Eq, 0, kiwi.Strength.create(6, 1000000)))
+
+				solver.updateVariables()
+				assert.equal(x.value(), 100)
+			})
+		})
 	})
 })
