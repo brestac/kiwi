@@ -162,7 +162,11 @@ export class Variable {
 	}
 
 	public toString(): string {
-		return this._context + '[' + this._name + ':' + this._value + ']'
+		const info = [this._owner, this._name].reduce((p : any, n: string | undefined) => {
+			return (n?.length) ? [...p, n] : p
+		}, []).join('.')
+
+		return '[' + info + ':' + this._value + ']'
 	}
 
 	private _name: string

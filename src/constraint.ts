@@ -112,7 +112,7 @@ export class Constraint {
 
 	public toString(): string {
 		return (
-			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 (' + this._strength.toString() + ')'
+			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 ' + this._strength.toString()
 		)
 	}
 
