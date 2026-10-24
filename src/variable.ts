@@ -1,6 +1,6 @@
 import type {Expression} from './expression.js'
 
-type Callback = (value: number, previousValue: number) => void
+export type Callback = (value: number, previousValue: number) => void
 function newExpression(...args: any[]): Expression {
 	const ctor = Variable._Expression
 	if (ctor === undefined) throw new Error('Expression is not registered: import kiwi from its entry point')
@@ -260,6 +260,8 @@ export class Variable {
 	private _owner?: string = undefined
 	private _id: number = VarId++
 	public _callback: Callback | undefined = undefined
+	public _sharedOutputIndex: number = -1
+	public _notify: number = 0
 }
 
 /**
