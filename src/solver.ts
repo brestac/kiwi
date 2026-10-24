@@ -10,6 +10,13 @@ import {Variable} from './variable.js'
  *
  * @class
  */
+export interface SolverOptions {
+	worker?: boolean,
+	floatPrecision?: number,
+	refreshRate?: number,
+	debug?: boolean
+}
+
 export class Solver {
 	/**
 	 * @type {number} - The max number of solver iterations before an error
