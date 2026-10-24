@@ -171,11 +171,16 @@ export class Solver {
 	 * @param {SymbolicWeight} strength The new strength for the constraint
 	 */
 	public updateStrengthTo(constraint: Constraint, strength: SymbolicWeight): void {
-		let cnPair = this._cnMap.find(constraint)
+		this._updateStrengthToById(constraint.id(), strength)
+	}
+
+	public _updateStrengthToById(id: number, strength: SymbolicWeight): void {
+		let cnPair = this._cnMap.findById(id)
 		if (cnPair === undefined) {
 			throw new Error('unknown constraint')
 		}
 
+		let constraint = cnPair.first
 		let oldStrength = constraint.strength()
 
 		if (oldStrength.equals(Strength.required) || strength.equals(Strength.required)) {
@@ -209,11 +214,16 @@ export class Solver {
 	 * @param {Number} constant The new constant for the constraint's expression
 	 */
 	public updateConstantTo(constraint: Constraint, constant: number): void {
-		let cnPair = this._cnMap.find(constraint)
+		this._updateConstantToById(constraint.id(), constant)
+	}
+
+	public _updateConstantToById(id: number, constant: number): void {
+		let cnPair = this._cnMap.findById(id)
 		if (cnPair === undefined) {
 			throw new Error('unknown constraint')
 		}
 
+		let constraint = cnPair.first
 		let newExprConstant = -constant
 		let oldExprConstant = constraint.expression().constant()
 		if (newExprConstant === oldExprConstant) {
@@ -951,7 +961,7 @@ export class Solver {
 		return `${this.constructor.name}: ${constraints.length} constraints, ${this._varMap.array.length} variables\n${description}`
 	}
 
-	private _cnMap = createCnMap()
+	public  _cnMap = createCnMap()
 	private _rowMap = createRowMap()
 	private _varMap = createVarMap()
 	private _editMap = createEditMap()

@@ -51,6 +51,16 @@ class IndexedMap<T extends {id(): number}, U> {
 	}
 
 	/**
+	 * Returns the pair associated with the given key id, or undefined.
+	 *
+	 * @param key The key to locate in the array.
+	 */
+	public findById(id: number) {
+		const i = this.index[id]
+		return i === undefined ? undefined : this.array[i]
+	}
+
+	/**
 	 * Returns the pair associated with the key if it exists.
 	 *
 	 * If the key does not exist, a new pair will be created and
