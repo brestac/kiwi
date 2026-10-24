@@ -155,6 +155,6 @@ export class SymbolicWeight {
 	}
 
 	public toString(): string {
-		return '[' + this._levels.join(', ') + ']'
+		return '(' + this._levels.join(', ') + ')'
 	}
 }
