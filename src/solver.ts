@@ -5,6 +5,14 @@ import {Strength} from './strength.js'
 import {SymbolicWeight} from './symbolicweight.js'
 import {Variable} from './variable.js'
 
+import {SolverInterface} from './worker/solverinterface.js'
+
+export interface SolverOptions {
+	worker?: boolean,
+	floatPrecision?: number,
+	refreshRate?: number
+}
+
 /**
  * The constraint solver class.
  *
@@ -18,10 +26,27 @@ export class Solver {
 	 */
 	public maxIterations = 1000
 
+	static workerFactory: ((options?: any) => SolverInterface) | undefined = undefined
+
+	static create(options: SolverOptions = {}): Solver | SolverInterface {
+		if (options ?.worker == true) {
+			if (!globalThis.crossOriginIsolated) {
+				throw new Error('Option worker=true. The client is not crossOriginIsolated.\nYou may need to add the following headers to your server:\nCross-Origin-Opener-Policy=same-origin\nCross-Origin-Embedder-Policy=require-corp')
+			}
+
+			if (!Solver.workerFactory) {
+				throw new Error('Option worker=true. Worker support is not registered: import Solver from the package entry point.')
+			}
+
+			return Solver.workerFactory(options)
+		} else {
+			return new Solver(options)
+		}
+	}
 	/**
 	 * Construct a new Solver.
 	 */
-	constructor() {}
+	constructor(options?: SolverOptions) {}
 
 	/**
 	 * Creates and add a constraint to the solver.
@@ -421,7 +446,7 @@ export class Solver {
 	 * If a symbol does not exist for the variable, one will be created.
 	 * @private
 	 */
-	private _getVarSymbol(variable: Variable): Symbol {
+	protected _getVarSymbol(variable: Variable): Symbol {
 		let factory = () => this._makeSymbol(SymbolType.External)
 		return this._varMap.setDefault(variable, factory).second
 	}
@@ -944,7 +969,7 @@ export class Solver {
 	 *
 	 * @private
 	 */
-	private _makeSymbol(type: SymbolType): Symbol {
+	public _makeSymbol(type: SymbolType): Symbol {
 		return new Symbol(type, this._idTick++)
 	}
 
@@ -955,9 +980,13 @@ export class Solver {
 		return `${this.constructor.name}: ${constraints.length} constraints, ${this._varMap.array.length} variables\n${description}`
 	}
 
-	public  _cnMap = createCnMap()
-	private _rowMap = createRowMap()
-	private _varMap = createVarMap()
+	public isAsync(): boolean {
+		return false
+	}
+
+	public _cnMap = createCnMap()
+	protected _rowMap = createRowMap()
+	protected _varMap = createVarMap()
 	private _editMap = createEditMap()
 	private _infeasibleRows: Symbol[] = []
 	private _objective: ObjectiveRow = new ObjectiveRow()
@@ -1035,7 +1064,7 @@ function createEditMap(): IMap<Variable, IEditInfo> {
  * An enum defining the available symbol types.
  * @private
  */
-enum SymbolType {
+export enum SymbolType {
 	Invalid,
 	External,
 	Slack,
@@ -1047,7 +1076,7 @@ enum SymbolType {
  * An internal class representing a symbol in the solver.
  * @private
  */
-class Symbol {
+export class Symbol {
 	/**
 	 * Construct a new Symbol
 	 *
