@@ -3,7 +3,7 @@ var assert = typeof window === 'undefined' ? (await import('assert')).default : 
 
 describe('import kiwi', function () {
 	it('imports kiwi', async function () {
-		// const kiwi = await import('@lume/kiwi') // self-referencing import does not work due to https://github.com/nodejs/node/issues/50334
+
 		const kiwi = await import('../dist/kiwi.js')
 
 		describe('kiwi', function () {
@@ -11,6 +11,158 @@ describe('import kiwi', function () {
 				var solver = new kiwi.Solver()
 				assert(solver)
 			})
+
+			if (typeof window !== 'undefined') {
+				describe('Worker', function () {
+
+					it('addConstraints', function (done) {
+						const worker = kiwi.Solver.create({worker: true})
+						const x = new kiwi.Variable("x")
+						x.subscribe((value, prev) => {
+							assert.equal(value, 100)
+							done()
+						})
+
+						const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+						worker.addConstraints([constraint])
+						worker.updateVariables()
+					})
+
+					it('addConstraints => updateConstraint', async function (done) {
+						const worker = kiwi.Solver.create({worker: true, refreshRate:60})
+
+						const x = new kiwi.Variable("x")
+						const expected = [100, 50, 60]
+						let result = []
+
+						x.subscribe((value, prev) => {
+							result.push(value)
+							console.log(result)
+							if (result.length == expected.length) {
+								const equals = result.every(i => expected.includes(i))
+
+								if (equals) {
+									done()
+								} else {
+									done(new Error(`expected values == ${expected.toString()}, was ${result.toString()}`))
+								}
+							}
+						})
+
+						const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, expected.at(0), kiwi.Strength.medium)
+						worker.addConstraints([constraint])
+						worker.updateVariables()
+						await wait(100)
+
+						worker.updateConstantTo(constraint, expected.at(1))
+						worker.updateVariables()
+						await wait(100)
+
+						worker.updateConstantTo(constraint, expected.at(2))
+						worker.updateVariables(() => console.log("done"))
+					})
+
+					it('addConstraints => updateConstraint with floatPrecision==2', async function (done) {
+						const worker = kiwi.Solver.create({worker: true, refreshRate:60, floatPrecision:2})
+
+						const x = new kiwi.Variable("x")
+						const expected = [100, 50.5, 60.5]
+						let result = []
+
+						x.subscribe((value, prev) => {
+							result.push(value)
+							if (result.length == expected.length) {
+								const equals = result.every(i => expected.includes(i))
+
+								if (equals) {
+									done()
+								} else {
+									done(new Error(`expected values == ${expected.toString()}, was ${result.toString()}`))
+								}
+							}
+						})
+
+						const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, expected.at(0), kiwi.Strength.medium)
+						worker.addConstraints([constraint])
+						worker.updateVariables()
+						await wait(100)
+
+						worker.updateConstantTo(constraint, expected.at(1))
+						worker.updateVariables()
+						await wait(100)
+
+						worker.updateConstantTo(constraint, expected.at(2))
+						worker.updateVariables(() => console.log("done"))
+					})
+
+					it('callbacks: addConstraints, updateConstantTo, updateStrengthTo then updateVariables, in order', function (done) {
+						const worker = kiwi.Solver.create({worker: true, refreshRate: 0})
+						const x = new kiwi.Variable('x')
+						const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+						const events = []
+
+						worker.addConstraints([constraint], () => events.push('added'))
+						worker.updateConstantTo(constraint, 50, () => events.push('constant'))
+						worker.updateStrengthTo(constraint, kiwi.Strength.strong, () => events.push('strength'))
+						worker.updateVariables(() => {
+							try {
+								events.push('updated')
+								assert.deepEqual(events, ['added', 'constant', 'strength', 'updated'])
+								assert.equal(worker.valueOfVariable(x), 50)
+								done()
+							} catch (error) {
+								done(error)
+							}
+						})
+					})
+
+					it('callbacks: removeConstraints', function (done) {
+						const worker = kiwi.Solver.create({worker: true, refreshRate: 0})
+						const x = new kiwi.Variable('x')
+						const constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+
+						worker.addConstraints([constraint])
+						worker.removeConstraints([constraint], () => {
+							worker.updateVariables(() => {
+								try {
+									assert.equal(worker.valueOfVariable(x), 0)
+									done()
+								} catch (error) {
+									done(error)
+								}
+							})
+						})
+					})
+
+					it('callbacks: several pending updateVariables callbacks are all called (throttled worker)', function (done) {
+						const worker = kiwi.Solver.create({worker: true}) // 60 Hz : les mises à jour sont fusionnées
+						const x = new kiwi.Variable('x')
+						let called = 0
+
+						worker.addConstraints([new kiwi.Constraint(x, kiwi.Operator.Eq, 10, kiwi.Strength.medium)])
+						for (let i = 0; i < 3; i++) {
+							worker.updateVariables(() => {
+								if (++called === 3) done()
+							})
+						}
+					})
+
+					it('more than 128 variables, none with a callback', function (done) {
+						const worker = kiwi.Solver.create({worker: true, refreshRate: 0})
+						const variables = Array.from({length: 300}, () => new kiwi.Variable())
+
+						worker.addConstraints(variables.map((v, i) => new kiwi.Constraint(v, kiwi.Operator.Eq, i, kiwi.Strength.medium)))
+						worker.updateVariables(() => {
+							try {
+								variables.forEach((v, i) => assert.equal(worker.valueOfVariable(v), i))
+								done()
+							} catch (error) {
+								done(error)
+							}
+						})
+					})
+				})
+			}
 		})
 
 		describe('Variable', function () {
@@ -527,5 +679,173 @@ describe('import kiwi', function () {
 				assert.equal(left.value(), 20)
 			})
 		})
+
+		describe('toJSON', function () {
+			it('constraint', function () {
+				var x = new kiwi.Variable("left")
+				x.setValue(100)
+				x.setContext({ owner: "truc" })
+
+				var constraint1 = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+				var json_constraint = constraint1.toJSON()
+				var constraint2 = kiwi.Constraint.fromJSON(json_constraint)
+				assert.equal(constraint1.toString(), constraint2.toString())
+			})
+		})
+
+		describe('Binary encoding', function () {
+			it('variable no name, no owner, no encoding', function () {
+				var x = new kiwi.Variable()
+				x.setValue(100)
+
+				var encoder = new kiwi.BinaryEncoder()
+				x.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Variable.fromBinary(decoder)
+
+				assert.equal(decoded.value(), 100)
+				assert.equal(decoded.name(), '')
+				assert.equal(decoded.owner(), undefined)
+			})
+
+			it('variable with name, owner, no encoding', function () {
+				var x = new kiwi.Variable('toto')
+				x.setOwner('tata')
+				x.setValue(100)
+
+				var encoder = new kiwi.BinaryEncoder()
+				x.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Variable.fromBinary(decoder)
+
+				assert.equal(decoded.name(), '')
+				assert.equal(decoded.owner(), undefined)
+			})
+
+			it('variable no name, no owner, encoding', function () {
+				var x = new kiwi.Variable({encodeName:true, encodeOwner:true})
+				x.setValue(100)
+
+				var encoder = new kiwi.BinaryEncoder()
+				x.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Variable.fromBinary(decoder)
+
+				assert.equal(decoded.name(), '')
+				assert.equal(decoded.owner(), undefined)
+			})
+
+			it('variable with name, owner, encoding', function () {
+				var x = new kiwi.Variable('toto', {encodeName:true, encodeOwner:true})
+				x.setOwner('tata')
+				x.setValue(100)
+
+				var encoder = new kiwi.BinaryEncoder()
+				x.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Variable.fromBinary(decoder)
+
+				assert.equal(decoded.name(), 'toto')
+				assert.equal(decoded.owner(), 'tata')
+			})
+
+			it('variable with name, no owner, encoding', function () {
+				var x = new kiwi.Variable('toto', {encodeName:true, encodeOwner:true})
+				x.setValue(100)
+
+				var encoder = new kiwi.BinaryEncoder()
+				x.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Variable.fromBinary(decoder)
+
+				assert.equal(decoded.name(), 'toto')
+				assert.equal(decoded.owner(), undefined)
+			})
+
+			it('variable with no name, owner, encoding', function () {
+				var x = new kiwi.Variable({encodeName:true, encodeOwner:true})
+				x.setOwner('tata')
+				x.setValue(100)
+
+				var encoder = new kiwi.BinaryEncoder()
+				x.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Variable.fromBinary(decoder)
+
+				assert.equal(decoded.name(), '')
+				assert.equal(decoded.owner(), 'tata')
+			})
+
+			it('expression', function () {
+				var x = new kiwi.Variable()
+				x.setValue(100)
+
+				var exp = new kiwi.Expression(x, 100)
+				var encoder = new kiwi.BinaryEncoder()
+				exp.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Expression.fromBinary(decoder)
+
+				assert.equal(exp.toString(), decoded.toString())
+
+				var exp2 = new kiwi.Expression(x, 100, exp)
+				var encoder2 = new kiwi.BinaryEncoder()
+				exp2.toBinary(encoder2)
+				var decoder2 = new kiwi.BinaryDecoder(encoder2.buffer())
+				var decoded2 = kiwi.Expression.fromBinary(decoder2)
+
+				assert.equal(exp2.toString(), decoded2.toString())
+			})
+
+			it('constraint', function () {
+				var x = new kiwi.Variable()
+				x.setValue(100)
+
+				var constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+				var encoder = new kiwi.BinaryEncoder()
+				constraint.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Constraint.fromBinary(decoder)
+
+				assert.equal(constraint.toString(), decoded.toString())
+			})
+
+			it('constraint with encoded variables with name, owner', function () {
+				var x = new kiwi.Variable('toto', {encodeName:true, encodeOwner:true})
+				x.setOwner('tata')
+				x.setValue(100)
+
+				var constraint = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+				var encoder = new kiwi.BinaryEncoder()
+				constraint.toBinary(encoder)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = kiwi.Constraint.fromBinary(decoder)
+
+				assert.equal(constraint.toString(), decoded.toString())
+			})
+
+			it('constraints array', function () {
+				var x = new kiwi.Variable()
+				x.setValue(100)
+
+				var y = new kiwi.Variable()
+				y.setValue(50)
+
+				var constraint1 = new kiwi.Constraint(x, kiwi.Operator.Eq, 100, kiwi.Strength.medium)
+				var constraint2 = new kiwi.Constraint(y, kiwi.Operator.Le, 50, kiwi.Strength.strong)
+				var constraints = [constraint1, constraint2]
+
+				var encoder = new kiwi.BinaryEncoder()
+				encoder.encodeMany(constraints)
+				var decoder = new kiwi.BinaryDecoder(encoder.buffer())
+				var decoded = decoder.decodeMany(kiwi.Constraint)
+
+				let desc1 = constraints.map(cst => cst.toString()).join(",")
+				let desc2 = decoded.map(cst => cst.toString()).join(",")
+				assert.equal(desc1, desc2)
+			})
+		})
 	})
 })
+
+const wait = (delay) => new Promise((res, rej) => setTimeout(res, delay));

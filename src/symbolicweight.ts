@@ -1,3 +1,5 @@
+import {BinaryDecoder, BinaryEncoder} from './worker/binary.js'
+
 /**
  * The number of strictly-ordered priority levels a SymbolicWeight
  * spans. Level 0 is reserved for `Strength.required` (see strength.ts);
@@ -6,7 +8,7 @@
  * (LEVEL_COUNT - 1).
  * @private
  */
-export const LEVEL_COUNT = 8
+const DEFAULT_LEVEL_COUNT = 8
 
 /**
  * Test whether a plain number is approximately zero.
@@ -39,19 +41,21 @@ function nearZeroValue(value: number): boolean {
  * @private
  */
 export class SymbolicWeight {
+	static LEVEL_COUNT: number = DEFAULT_LEVEL_COUNT
+
 	private constructor(private readonly _levels: readonly number[]) {}
 
 	/**
 	 * The zero weight (identity for `plus`/`minus`).
 	 */
-	static readonly zero = new SymbolicWeight(new Array(LEVEL_COUNT).fill(0))
+	static readonly zero = new SymbolicWeight(new Array(SymbolicWeight.LEVEL_COUNT).fill(0))
 
 	/**
 	 * A sentinel weight greater than any weight reachable through
 	 * normal construction and arithmetic. Used internally as the
 	 * initial "nothing found yet" value in ratio-minimization loops.
 	 */
-	static readonly infinity = new SymbolicWeight(new Array(LEVEL_COUNT).fill(Infinity))
+	static readonly infinity = new SymbolicWeight(new Array(SymbolicWeight.LEVEL_COUNT).fill(Infinity))
 
 	/**
 	 * Construct a weight with `weight` at the given `level` and zero
@@ -60,15 +64,15 @@ export class SymbolicWeight {
 	 * @private
 	 */
 	static create(level: number, weight: number = 1): SymbolicWeight {
-		if (!Number.isInteger(level) || level < 0 || level >= LEVEL_COUNT) {
-			throw new Error(`strength level must be an integer between 0 and ${LEVEL_COUNT - 1}, was ${level}`)
+		if (!Number.isInteger(level) || level < 0 || level >= SymbolicWeight.LEVEL_COUNT) {
+			throw new Error(`strength level must be an integer between 0 and ${SymbolicWeight.LEVEL_COUNT - 1}, was ${level}`)
 		}
 
 		if (!Number.isInteger(weight) || weight < 0) {
 			throw new Error(`weight must be an unsigned integer, was ${weight}`)
 		}
 
-		let levels = new Array(LEVEL_COUNT).fill(0)
+		let levels = new Array(SymbolicWeight.LEVEL_COUNT).fill(0)
 		levels[level] = weight
 
 		return new SymbolicWeight(levels)
@@ -114,7 +118,7 @@ export class SymbolicWeight {
 	 * first level that isn't approximately zero is itself negative.
 	 */
 	isNegative(): boolean {
-		for (let i = 0; i < LEVEL_COUNT; i++) {
+		for (let i = 0; i < SymbolicWeight.LEVEL_COUNT; i++) {
 			if (!nearZeroValue(this._levels[i])) {
 				return this._levels[i] < 0
 			}
@@ -126,7 +130,7 @@ export class SymbolicWeight {
 	 * Whether this weight is approximately zero at every level.
 	 */
 	nearZero(): boolean {
-		for (let i = 0; i < LEVEL_COUNT; i++) {
+		for (let i = 0; i < SymbolicWeight.LEVEL_COUNT; i++) {
 			if (!nearZeroValue(this._levels[i])) {
 				return false
 			}
@@ -138,7 +142,7 @@ export class SymbolicWeight {
 	 * Strict lexicographic less-than.
 	 */
 	lessThan(other: SymbolicWeight): boolean {
-		for (let i = 0; i < LEVEL_COUNT; i++) {
+		for (let i = 0; i < SymbolicWeight.LEVEL_COUNT; i++) {
 			let diff = this._levels[i] - other._levels[i]
 			if (!nearZeroValue(diff)) {
 				return diff < 0
@@ -156,5 +160,34 @@ export class SymbolicWeight {
 
 	public toString(): string {
 		return '(' + this._levels.join(', ') + ')'
+	}
+
+	public toJSON() : readonly number[] {
+		return this._levels
+	}
+
+	static fromJSON(levels: number[]) {
+		return new SymbolicWeight(levels)
+	}
+
+	static sizeOf() : number {
+		return SymbolicWeight.LEVEL_COUNT * Uint32Array.BYTES_PER_ELEMENT
+	}
+
+	public toBinary(encoder: BinaryEncoder) : void {
+		for (let n = 0; n < this._levels.length; n++) {
+      encoder.encodeUint32(this._levels[n])
+    }
+	}
+
+	static fromBinary(decoder: BinaryDecoder) : SymbolicWeight {
+		let levels = []
+
+    for (let n = 0; n < SymbolicWeight.LEVEL_COUNT; n++) {
+      const value = decoder.decodeUint32()
+      levels.push(value)
+    }
+
+    return new SymbolicWeight(levels)
 	}
 }

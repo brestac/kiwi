@@ -141,7 +141,7 @@ class IndexedMap<T extends {id(): number}, U> {
  * @private
  */
 // tslint:disable: max-classes-per-file
-class Pair<T, U> {
+export class Pair<T, U> {
 	/**
 	 * Construct a new Pair object.
 	 *

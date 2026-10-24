@@ -2,7 +2,7 @@ import {Expression} from './expression.js'
 import {Strength} from './strength.js'
 import {SymbolicWeight} from './symbolicweight.js'
 import {Variable} from './variable.js'
-
+import {BinaryDecoder, BinaryEncoder} from './worker/binary.js'
 /**
  * An enum defining the linear constraint operators.
  *
@@ -116,6 +116,58 @@ export class Constraint {
 		return (
 			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 ' + this._strength.toString() + (required ? '(required)' : '')
 		)
+	}
+	/**
+	 * Returns the JSON representation of the constraint.
+	 * @private
+	 */
+	public toJSON(): any {
+		return {
+			expression: this._expression.toJSON(),
+			operator: this._operator,
+			strength: this._strength.toJSON(),
+			id: this._id
+		}
+	}
+
+	static fromJSON(json: any) : Constraint {
+		let expression = Expression.fromJSON(json.expression)
+		let operator = json.operator
+		let strength = SymbolicWeight.fromJSON(json.strength)
+
+		let constraint = new Constraint(expression, operator, undefined, strength)
+		constraint._id = json.id
+
+		return constraint
+	}
+
+	public sizeOf() : number {
+			return 4 /*_id*/ + this._expression.sizeOf() + 1 /*_operator*/ + SymbolicWeight.sizeOf() /*_strength*/
+	}
+
+	public toBinary(encoder: BinaryEncoder) : void {
+		encoder.encodeUint32(this.sizeOf())
+		encoder.encodeUint32(this._id)
+		encoder.encodeUint8(this._operator)
+		encoder.encode(this._strength)
+		encoder.encode(this._expression)
+	}
+
+	static fromBinary(decoder: BinaryDecoder) : Constraint {
+		const size = decoder.decodeUint32()
+		const id = decoder.decodeUint32()
+		const operator = decoder.decodeUint8()
+		const strength = SymbolicWeight.fromBinary(decoder)
+		const expression = Expression.fromBinary(decoder)
+
+		let constraint = new Constraint(expression, operator, undefined, strength)
+		constraint._id = id
+
+		return constraint
+	}
+
+	public getVariables() : Set<Variable> {
+		return this._expression.getVariables()
 	}
 
 	private _expression: Expression

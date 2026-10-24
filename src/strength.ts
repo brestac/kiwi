@@ -1,4 +1,4 @@
-import {LEVEL_COUNT, SymbolicWeight} from './symbolicweight.js'
+import {SymbolicWeight} from './symbolicweight.js'
 
 /**
  * @class Strength

@@ -1,6 +1,7 @@
 import {createMap, IMap} from './maptype.js'
 import {Variable} from './variable.js'
-import type {Pair} from './maptype.js'
+import type { Pair } from './maptype.js'
+import {BinaryDecoder, BinaryEncoder} from './worker/binary.js'
 
 /**
  * An expression of variable terms and a constant.
@@ -129,6 +130,75 @@ export class Expression {
 		}
 
 		return result
+	}
+
+	/**
+	 * Returns the JSON representation of the expression.
+	 * @private
+	 */
+	public toJSON(): any {
+		return {
+			terms: this._terms.array.map(pair => ({variable:pair.first.toJSON(), coefficient:pair.second})),
+			constant: this._constant,
+		}
+	}
+
+	static fromJSON(json: any) : Expression {
+		let terms = createMap<Variable, number>()
+		let json_terms = json.terms
+		for (let i = 0; i < json_terms.length; i++) {
+			let json_term = json_terms[i]
+			let variable = Variable.fromJSON(json_term.variable)
+			terms.insert(variable, json_term.coefficient)
+		}
+
+		let expression = new Expression()
+		expression._terms = terms
+		expression._constant = json.constant
+
+		return expression
+	}
+
+	public sizeOf() : number {
+			let byte_length = 4 /*nterms*/ + 8 /*_constant*/
+			byte_length += this._terms.array.reduce((prev: number, pair: any) => {
+						return prev + pair.first.sizeOf() + 8 /*_coefficient*/
+			}, 0)
+
+			return byte_length
+	}
+
+	public toBinary(encoder: BinaryEncoder) : void {
+		const terms = this._terms.array
+		encoder.encodeUint32(terms.length)
+
+    terms.forEach((pair: Pair<Variable, number>, _: number) => {
+			encoder.encode(pair.first)
+			encoder.encodeFloat64(pair.second)
+		})
+
+		encoder.encodeFloat64(this._constant)
+	}
+
+	static fromBinary(decoder: BinaryDecoder) : Expression {
+		let terms = createMap<Variable, number>()
+    const nterms = decoder.decodeUint32()
+
+		for (let n = 0; n < nterms; n++) {
+			const variable = Variable.fromBinary(decoder)
+			const coefficient = decoder.decodeFloat64()
+			terms.insert(variable, coefficient)
+		}
+
+		let expression = new Expression()
+		expression._terms = terms
+		expression._constant = decoder.decodeFloat64()
+
+		return expression
+	}
+
+	public getVariables() : Set<Variable> {
+		return new Set(this._terms.array.map(pair => pair.first))
 	}
 
 	private _terms: IMap<Variable, number>

@@ -1,6 +1,13 @@
 import type {Expression} from './expression.js'
+import {BinaryDecoder, BinaryEncoder} from './worker/binary.js'
 
-type Callback = (value: number, previousValue: number) => void
+export type Callback = (value: number, previousValue: number) => void
+
+interface VariableOptions {
+	encodeName?: boolean,
+	encodeOwner?: boolean
+}
+
 function newExpression(...args: any[]): Expression {
 	const ctor = Variable._Expression
 	if (ctor === undefined) throw new Error('Expression is not registered: import kiwi from its entry point')
@@ -13,10 +20,19 @@ function newExpression(...args: any[]): Expression {
  * @param {String} [name=""] The name to associated with the variable.
  */
 export class Variable {
-	constructor(name: string = '') {
-		this._name = name
+	constructor(nameOrOptions?: string | VariableOptions, options?:VariableOptions) {
+		if (typeof nameOrOptions == 'object') {
+			this._name = ''
+			this._options = nameOrOptions
+		} else {
+			this._name = nameOrOptions ?? ''
+			this._options = options
+		}
 	}
 
+	public options() {
+		return this._options
+	}
 	/**
 	 * Returns the unique id number of the variable.
 	 * @private
@@ -161,9 +177,61 @@ export class Variable {
 	 */
 	public toJSON(): any {
 		return {
-			name: this._name,
+			id: this._id,
 			value: this._value,
+			sharedVarIndex: this._sharedOutputIndex,
+			notify: this._notify,
+			name: this._name,
+			context: this._context
 		}
+	}
+
+	static fromJSON(json: any) : Variable {
+		let variable = new Variable()
+		variable._id = json.id
+		variable._value = json.value
+		variable._sharedOutputIndex = json.sharedVarIndex
+		variable._notify = json.notify
+		variable._name = json.name
+		variable._context  = json.context
+
+		return variable
+	}
+
+	public sizeOf() : number {
+			let byte_length = (4 /*size*/ + 4 /*_id*/ + 8 /*_value*/ + 4 /*_sharedOutputIndex*/ + 1 /*_notify*/ + 1 /*name length*/ + 1 /*owner length*/)
+			if (this._options?.encodeName && this._name?.length) byte_length += this._name?.length??0
+			if (this._options?.encodeOwner && this._owner?.length) byte_length += this._owner?.length??0
+
+			return byte_length
+	}
+
+	public toBinary(encoder: BinaryEncoder) : void {
+		encoder.encodeUint32(this.sizeOf())
+		encoder.encodeUint32(this._id)
+		encoder.encodeFloat64(this._value)
+		encoder.encodeInt32(this._sharedOutputIndex)
+		encoder.encodeUint8(this._notify)
+
+		const name = this._options?.encodeName ? this._name : undefined
+		const owner = this._options?.encodeOwner ? this._owner : undefined
+
+		encoder.encodeString(name)
+		encoder.encodeString(owner)
+	}
+
+	static fromBinary(decoder: BinaryDecoder) : Variable {
+		let variable = new Variable()
+
+		decoder.moveOffset(4)
+		variable._id = decoder.decodeUint32()
+		variable._value = decoder.decodeFloat64()
+		variable._sharedOutputIndex = decoder.decodeInt32()
+		variable._notify = decoder.decodeUint8()
+		variable._name = decoder.decodeString()??''
+		variable._owner = decoder.decodeString()
+
+		return variable
 	}
 
 	public toString(): string {
@@ -176,12 +244,15 @@ export class Variable {
 
 	/** @private Renseigné par expression.ts. */
 	static _Expression: (new (...args: any[]) => Expression) | undefined = undefined
+	private _options?: VariableOptions = undefined
 	private _name: string
 	private _value: number = 0.0
 	private _context: any = undefined
 	private _owner?: string = undefined
 	private _id: number = VarId++
 	public _callback: Callback | undefined = undefined
+	public _sharedOutputIndex: number = -1
+	public _notify: number = 0
 }
 
 /**
