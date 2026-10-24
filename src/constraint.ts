@@ -111,8 +111,10 @@ export class Constraint {
 	}
 
 	public toString(): string {
+		const required = this._strength === Strength.required
+
 		return (
-			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 (' + this._strength.toString() + ')'
+			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 ' + this._strength.toString() + (required ? '(required)' : '')
 		)
 	}
 

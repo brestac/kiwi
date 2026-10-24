@@ -117,15 +117,14 @@ export class Expression {
 	public toString(): string {
 		let result = this._terms.array
 			.map(function (pair) {
-				return pair.second + '*' + pair.first.toString()
+				return ((pair.second == 1.0) ? '' : pair.second + ' * ') + pair.first.toString()
 			})
 			.join(' + ')
 
 		if (!this.isConstant() && this._constant !== 0) {
-			result += ' + '
+			result += (this._constant > 0) ? ' + ' : ' - '
+			result += Math.abs(this._constant)
 		}
-
-		result += this._constant
 
 		return result
 	}
