@@ -1,5 +1,6 @@
 import { defineConfig } from 'rollup';
 import typescript from 'rollup-plugin-typescript2';
+import webWorkerLoader from 'rollup-plugin-web-worker-loader';
 
 const license = /*js*/ `
 /*-----------------------------------------------------------------------------
@@ -72,6 +73,12 @@ export default defineConfig({
     }
 	},
 	plugins: [
+		webWorkerLoader({
+			targetPlatform: 'browser',
+			extensions: ['.ts', '.js'],
+			inline: true, // Force l'inlining via Blob URL
+			sourcemap: false,
+		}),
 		typescript({
 			tsconfigOverride: {
 				compilerOptions: {
