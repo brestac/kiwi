@@ -1,8 +1,7 @@
 import {Expression} from './expression.js'
 import {Strength} from './strength.js'
-import {SymbolicWeight} from './symbolicweight.js'
+import {SymbolicWeight, LEVEL_COUNT} from './symbolicweight.js'
 import {Variable} from './variable.js'
-
 /**
  * An enum defining the linear constraint operators.
  *
@@ -116,6 +115,58 @@ export class Constraint {
 		return (
 			this._expression.toString() + ' ' + ['<=', '>=', '='][this._operator] + ' 0 ' + this._strength.toString() + (required ? '(required)' : '')
 		)
+	}
+	/**
+	 * Returns the JSON representation of the constraint.
+	 * @private
+	 */
+	public toJSON(): any {
+		return {
+			expression: this._expression.toJSON(),
+			operator: this._operator,
+			strength: this._strength.toJSON(),
+			id: this._id
+		}
+	}
+
+	static fromJSON(json: any) : Constraint {
+		let expression = Expression.fromJSON(json.expression)
+		let operator = json.operator
+		let strength = SymbolicWeight.fromJSON(json.strength)
+
+		let constraint = new Constraint(expression, operator, undefined, strength)
+		constraint._id = json.id
+
+		return constraint
+	}
+
+	public toBinary(callback: ((variable: Variable) => void) | undefined) : Int32Array {
+		if (callback !== undefined) {
+			this._expression.terms().array.forEach(({first: variable}: any) => callback(variable))
+		}
+
+		const exp = this._expression.toBinary()
+		const strength = this._strength.toBinary()
+		const size = exp.length + strength.length + 3 // the full size of the packed array, including the size number
+
+		return new Int32Array([size, this._id, this._operator, ...strength, ...exp])
+	}
+
+	static fromBinary(data: Int32Array) : Constraint {
+		if (data.length < 11) {
+			throw new Error('Constraint.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
+		}
+
+		const size = data.at(0) as number
+		const id = data.at(1) as number
+		const operator = data.at(2) as number
+		const strength = SymbolicWeight.fromBinary(data.slice(3, 3 + LEVEL_COUNT))
+		const expression = Expression.fromBinary(data.slice(3 + LEVEL_COUNT, size))
+
+		let constraint = new Constraint(expression, operator, undefined, strength)
+		constraint._id = id
+
+		return constraint
 	}
 
 	private _expression: Expression

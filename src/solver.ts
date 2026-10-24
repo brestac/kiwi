@@ -10,6 +10,7 @@ import {Variable} from './variable.js'
  *
  * @class
  */
+
 export class Solver {
 	/**
 	 * @type {number} - The max number of solver iterations before an error

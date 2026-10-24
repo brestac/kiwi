@@ -157,4 +157,24 @@ export class SymbolicWeight {
 	public toString(): string {
 		return '(' + this._levels.join(', ') + ')'
 	}
+
+	public toJSON() : readonly number[] {
+		return this._levels
+	}
+
+	static fromJSON(levels: number[]) {
+		return new SymbolicWeight(levels)
+	}
+
+	public toBinary() : Int32Array {
+		return new Int32Array(this._levels)
+	}
+
+	static fromBinary(data: Int32Array) {
+		if (data.length !== LEVEL_COUNT) {
+			throw new Error('SymbolicWeight.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
+		}
+
+		return new SymbolicWeight(data as any as number[])
+	}
 }
