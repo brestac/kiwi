@@ -55,6 +55,22 @@ export class Variable {
 	}
 
 	/**
+	 * Returns the user owner string of the variable.
+	 * @private
+	 */
+	public owner(): string | undefined {
+		return this._owner
+	}
+
+	/**
+	 * Set the user context object of the variable.
+	 * @private
+	 */
+	public setOwner(owner: string): void {
+		this._owner = owner
+	}
+
+	/**
 	 * Returns the value of the variable.
 	 *
 	 * @return {Number} Calculated value
@@ -152,6 +168,7 @@ export class Variable {
 	private _name: string
 	private _value: number = 0.0
 	private _context: any = undefined
+	private _owner?: string = undefined
 	private _id: number = VarId++
 	public _callback: Callback | undefined = undefined
 }
