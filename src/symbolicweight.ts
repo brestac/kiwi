@@ -1,6 +1,6 @@
 /**
  * The number of strictly-ordered priority levels a SymbolicWeight
- * spans. Level 0 is reserved for `Strength.required` (see strength.ts);
+ * spans. Level 0 is reserved for `Strength.required` (see strength.ts)
  * levels 1 through `LEVEL_COUNT - 1` are available to ordinary
  * (non-required) constraint strengths, from strongest (1) to weakest
  * (LEVEL_COUNT - 1).
@@ -39,19 +39,19 @@ function nearZeroValue(value: number): boolean {
  * @private
  */
 export class SymbolicWeight {
-	private constructor(private readonly _levels: readonly number[]) {}
+	private constructor(private readonly _levels: Uint32Array) {}
 
 	/**
 	 * The zero weight (identity for `plus`/`minus`).
 	 */
-	static readonly zero = new SymbolicWeight(new Array(LEVEL_COUNT).fill(0))
+	static readonly zero = new SymbolicWeight(new Uint32Array(LEVEL_COUNT).fill(0))
 
 	/**
 	 * A sentinel weight greater than any weight reachable through
 	 * normal construction and arithmetic. Used internally as the
 	 * initial "nothing found yet" value in ratio-minimization loops.
 	 */
-	static readonly infinity = new SymbolicWeight(new Array(LEVEL_COUNT).fill(Infinity))
+	static readonly infinity = new SymbolicWeight(new Uint32Array(LEVEL_COUNT).fill(0xFFFFFFFF))
 
 	/**
 	 * Construct a weight with `weight` at the given `level` and zero
@@ -59,12 +59,16 @@ export class SymbolicWeight {
 	 *
 	 * @private
 	 */
-	static create(level: number, weight: number = 1.0): SymbolicWeight {
-		if (!Number.isInteger(level) || level > LEVEL_COUNT - 1) {
-			throw new Error(`strength level must be an integer between 1 and ${LEVEL_COUNT - 1}`)
+	static create(level: number, weight: number = 1): SymbolicWeight {
+		if (!Number.isInteger(level) || level < 0 || level > LEVEL_COUNT - 1) {
+			throw new Error(`strength level must be an integer between 0 and ${LEVEL_COUNT - 1}, was ${level}`)
 		}
 
-		let levels = new Array(LEVEL_COUNT).fill(0)
+		if (!Number.isInteger(weight) || weight < 0 || weight > Math.pow(2, 31) - 1) {
+			throw new Error(`strength weight must be an integer between 0 and 2^31 - 1, was ${weight}`)
+		}
+
+		let levels = new Uint32Array(LEVEL_COUNT).fill(0)
 		levels[level] = weight
 
 		return new SymbolicWeight(levels)
@@ -151,6 +155,26 @@ export class SymbolicWeight {
 	}
 
 	public toString(): string {
-		return '[' + this._levels.join(', ') + ']'
+		return '(' + this._levels.join(', ') + ')'
+	}
+
+	public toJSON() : any {
+		return this._levels
+	}
+
+	static fromJSON(levels: any) {
+		return new SymbolicWeight(levels as Uint32Array)
+	}
+
+	public toBinary() : Int32Array {
+		return new Int32Array(this._levels)
+	}
+
+	static fromBinary(data: Int32Array) {
+		if (data.length !== LEVEL_COUNT) {
+			throw new Error('SymbolicWeight.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
+		}
+
+		return new SymbolicWeight(data as any as Uint32Array)
 	}
 }

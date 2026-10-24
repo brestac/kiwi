@@ -3,7 +3,6 @@
 		"target": "esnext",
 		"module": "esnext",
 		"newLine": "lf",
-		//"strict": true, // aah: currently fails to build in strict mode, as previous build only specified noImplicitAny
 		"noImplicitAny": true,
 		"outDir": "dist",
 		"rootDir": "./src",

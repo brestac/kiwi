@@ -1,3 +1,4 @@
+
 export interface IMap<T extends {id(): number}, U> extends IndexedMap<T, U> {}
 
 export function createMap<T extends {id(): number}, U>(): IMap<T, U> {
@@ -47,6 +48,11 @@ class IndexedMap<T extends {id(): number}, U> {
 	 */
 	public find(key: T) {
 		const i = this.index[key.id()]
+		return i === undefined ? undefined : this.array[i]
+	}
+
+	public findById(id: number) {
+		const i = this.index[id]
 		return i === undefined ? undefined : this.array[i]
 	}
 
@@ -131,7 +137,7 @@ class IndexedMap<T extends {id(): number}, U> {
  * @private
  */
 // tslint:disable: max-classes-per-file
-class Pair<T, U> {
+export class Pair<T, U> {
 	/**
 	 * Construct a new Pair object.
 	 *

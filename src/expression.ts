@@ -129,6 +129,74 @@ export class Expression {
 		return result
 	}
 
+
+	/**
+	 * Returns the JSON representation of the expression.
+	 * @private
+	 */
+	public toJSON(): any {
+		return {
+			terms: this._terms.array.map(pair => ({variable:pair.first.toJSON(), coefficient:pair.second})),
+			constant: this._constant,
+		}
+	}
+
+	static fromJSON(json: any) : Expression {
+		let terms = createMap<Variable, number>()
+		let json_terms = json.terms
+		for (let i = 0; i < json_terms.length; i++) {
+			let json_term = json_terms[i]
+			let variable = Variable.fromJSON(json_term.variable)
+			terms.insert(variable, json_term.coefficient)
+		}
+
+		let expression = new Expression()
+		expression._terms = terms
+		expression._constant = json.constant
+
+		return expression
+	}
+
+	public toBinary(): Int32Array {
+		const terms_array = this._terms.array.reduce((prev: any, pair: any) => {
+			const variable_data = pair.first.toBinary()
+			const coefficient = pair.second
+			return [...prev, ...variable_data, coefficient]
+		}, [])
+
+		const nterms = this._terms.array.length
+		return new Int32Array([nterms, ...terms_array, this._constant])
+	}
+
+	static fromBinary(data: Int32Array) {
+		// if (data.length < 6) {
+		//   throw new Error('Expression.fromBinary(data: Int32Array) : invalid data length: ' + data.length)
+		// }
+
+		const nterms = data.at(0) as number
+
+		let terms = createMap<Variable, number>()
+		let offset = 1
+		let n = 0
+
+		while (n < nterms && offset < data.length) {
+			const variable_data_size = data.at(offset) as number
+			const variable_data = data.slice(offset, offset + variable_data_size)
+			const variable = Variable.fromBinary(variable_data)
+			const coefficient = data.at(offset + variable_data_size) as number
+
+			terms.insert(variable, coefficient)
+			offset += variable_data_size + 1
+			n++
+		}
+
+		let expression = new Expression()
+		expression._terms = terms
+		expression._constant = data.at(offset) as number
+
+		return expression
+	}
+
 	private _terms: IMap<Variable, number>
 	private _constant: number
 }

@@ -25,9 +25,28 @@ export class Solver {
 	public maxIterations = 1000
 
 	/**
-	 * Construct a new Solver.
 	 */
-	constructor() {}
+	static workerFactory: ((options?: any) => SolverInterface) | undefined = undefined
+
+	static create(options: SolverOptions = {}): Solver | SolverInterface {
+		if (options ?.worker == true) {
+			if (!globalThis.crossOriginIsolated) {
+				throw new Error('Option worker=true. The client is not crossOriginIsolated.\nYou may need to add the following headers to your server:\nCross-Origin-Opener-Policy=same-origin\nCross-Origin-Embedder-Policy=require-corp')
+			}
+
+			if (!Solver.workerFactory) {
+				throw new Error('Option worker=true. Worker support is not registered: import Solver from the package entry point.')
+			}
+
+			return Solver.workerFactory(options)
+		} else {
+			return new Solver(options)
+		}
+	}
+
+	constructor(options?: SolverOptions) {
+		Variable.debug = options ?.debug ?? false
+	}
 
 	/**
 	 * Creates and add a constraint to the solver.
@@ -171,11 +190,16 @@ export class Solver {
 	 * @param {SymbolicWeight} strength The new strength for the constraint
 	 */
 	public updateStrengthTo(constraint: Constraint, strength: SymbolicWeight): void {
-		let cnPair = this._cnMap.find(constraint)
+		this._updateStrengthToById(constraint.id(), strength)
+	}
+
+	public _updateStrengthToById(id: number, strength: SymbolicWeight): void {
+		let cnPair = this._cnMap.findById(id)
 		if (cnPair === undefined) {
 			throw new Error('unknown constraint')
 		}
 
+		let constraint = cnPair.first
 		let oldStrength = constraint.strength()
 
 		if (oldStrength.equals(Strength.required) || strength.equals(Strength.required)) {
@@ -209,11 +233,16 @@ export class Solver {
 	 * @param {Number} constant The new constant for the constraint's expression
 	 */
 	public updateConstantTo(constraint: Constraint, constant: number): void {
-		let cnPair = this._cnMap.find(constraint)
+		this._updateConstantToById(constraint.id(), constant)
+	}
+
+	public _updateConstantToById(id: number, constant: number): void {
+		let cnPair = this._cnMap.findById(id)
 		if (cnPair === undefined) {
 			throw new Error('unknown constraint')
 		}
 
+		let constraint = cnPair.first
 		let newExprConstant = -constant
 		let oldExprConstant = constraint.expression().constant()
 		if (newExprConstant === oldExprConstant) {
@@ -257,6 +286,10 @@ export class Solver {
 		this._dualOptimize()
 	}
 
+	public valueOfVariable(variable: Variable): bigint | number {
+		return variable.value()
+	}
+
 	/**
 	 * Return the fixed sign of the marker symbol's coefficient as it
 	 * was inserted into the constraint's row at creation time.
@@ -290,6 +323,10 @@ export class Solver {
 	 */
 	public getConstraints(): Constraint[] {
 		return this._cnMap.array.map(({first}) => first)
+	}
+
+	public getConstraintById(id: number): Constraint | undefined {
+		return this._cnMap.findById(id) ?.first
 	}
 
 	/**
@@ -413,7 +450,7 @@ export class Solver {
 	 * If a symbol does not exist for the variable, one will be created.
 	 * @private
 	 */
-	private _getVarSymbol(variable: Variable): Symbol {
+	protected _getVarSymbol(variable: Variable): Symbol {
 		let factory = () => this._makeSymbol(SymbolType.External)
 		return this._varMap.setDefault(variable, factory).second
 	}
@@ -936,7 +973,7 @@ export class Solver {
 	 *
 	 * @private
 	 */
-	private _makeSymbol(type: SymbolType): Symbol {
+	public _makeSymbol(type: SymbolType): Symbol {
 		return new Symbol(type, this._idTick++)
 	}
 
@@ -947,9 +984,13 @@ export class Solver {
 		return `${this.constructor.name}: ${constraints.length} constraints, ${this._varMap.array.length} variables\n${description}`
 	}
 
+	public isAsync(): boolean {
+		return false
+	}
+
 	private _cnMap = createCnMap()
-	private _rowMap = createRowMap()
-	private _varMap = createVarMap()
+	protected _rowMap = createRowMap()
+	protected _varMap = createVarMap()
 	private _editMap = createEditMap()
 	private _infeasibleRows: Symbol[] = []
 	private _objective: ObjectiveRow = new ObjectiveRow()
@@ -1027,7 +1068,7 @@ function createEditMap(): IMap<Variable, IEditInfo> {
  * An enum defining the available symbol types.
  * @private
  */
-enum SymbolType {
+export enum SymbolType {
 	Invalid,
 	External,
 	Slack,
@@ -1039,7 +1080,7 @@ enum SymbolType {
  * An internal class representing a symbol in the solver.
  * @private
  */
-class Symbol {
+export class Symbol {
 	/**
 	 * Construct a new Symbol
 	 *
