@@ -13,23 +13,12 @@ import {LEVEL_COUNT, SymbolicWeight} from './symbolicweight.js'
  * `Strength.create`.
  */
 export class Strength {
-	/**
-	 * Create a new symbolic strength at the given priority level.
-	 *
-	 * Several constraints created at the same level combine by simple
-	 * addition of their weights (e.g. many `weak` constraints whose
-	 * error terms end up in the same row) — this can never let their
-	 * combined effect outweigh a single constraint at a stronger
-	 * level, unlike the previous packed-number encoding.
-	 *
-	 * @param level Priority level: an integer from 1 (strongest
-	 *   available) to 7 (weakest).
-	 * @param [w=1] Weight, multiplies the level's contribution. Must
-	 *   be non-negative; negative values are clipped to 0.
-	 * @return strength
-	 */
 
-	static create(a: number, b: number, c: number) : SymbolicWeight {
+	static create(a: number, b: number = 0, c: number = 0) : SymbolicWeight {
+		if (!Number.isInteger(a) || !Number.isInteger(b) || !Number.isInteger(c)) {
+			throw new Error(`Strength arguments must be integral numbers`)
+		}
+
 		if (a == 1000 && b == 1000 && c == 1000) {
 				return SymbolicWeight.create(0, 1)
 		}
