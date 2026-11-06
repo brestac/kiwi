@@ -2,7 +2,7 @@ import { Solver, Symbol, SymbolType, SolverOptions } from '../solver.js'
 import { Constraint } from '../constraint.js'
 import { SymbolicWeight, LEVEL_COUNT } from '../symbolicweight.js'
 import { IMap, Pair } from '../maptype.js'
-import { Variable, int32ArrayToFloat } from '../variable.js'
+import { Variable, decodeFloat64 } from '../variable.js'
 
 import { SolverCommand, ACK_FLAG, ACK_DONE, ACK_UPDATED, ACK_WORDS } from './solvercommand.js'
 import { CommandConsumer, NO_COMMAND } from './commandqueue.js'
@@ -173,13 +173,13 @@ export class SolverWorker extends Solver {
   			break
       case SolverCommand.SUGGEST_VALUE: {
         const id = payload.at(0) as number
-        const constant = int32ArrayToFloat(payload.subarray(1, 3))
+        const constant = decodeFloat64(payload, 1)
         this._suggestValue(id, constant) // ? value * this._coefficient
   		}
   			break
   		case SolverCommand.UPDATE_CONSTANT: {
   			const id = payload.at(0) as number
-        const constant = int32ArrayToFloat(payload.subarray(1, 3))
+        const constant = decodeFloat64(payload, 1)
         super._updateConstantToById(id, constant)
   		}
   			break

@@ -1,7 +1,7 @@
 import { Expression } from '../expression.js'
 import { Constraint, Operator } from '../constraint.js'
 import { SymbolicWeight } from '../symbolicweight.js'
-import { Callback, Variable, floatToInt32Array } from '../variable.js'
+import { Callback, Variable, encodeFloat64 } from '../variable.js'
 import { SolverOptions } from '../solver.js'
 
 import { SolverCommand, ACK_FLAG, ACK_DONE, ACK_UPDATED, ACK_WORDS } from './solvercommand.js'
@@ -155,7 +155,7 @@ export class SolverInterface {
 	public updateConstantTo(constraint: Constraint, constant: number, callback?: () => void): void {
 		const payload = new Int32Array(3)
 		payload[0] = constraint.id()
-		payload.set(floatToInt32Array(constant), 1)
+		encodeFloat64(payload, 1, constant)
 
 		this.sendCommand(SolverCommand.UPDATE_CONSTANT, payload, callback)
 	}
@@ -184,7 +184,7 @@ export class SolverInterface {
 	public suggestValue(variable: Variable, value: number, callback?: () => void): void {
 		const payload = new Int32Array(3)
 		payload[0] = variable.id()
-		payload.set(floatToInt32Array(value), 1)
+		encodeFloat64(payload, 1, value)
 
 		this.sendCommand(SolverCommand.SUGGEST_VALUE, payload, callback)
 	}

@@ -1,5 +1,5 @@
 import {createMap, IMap} from './maptype.js'
-import {Variable, int32ArrayToFloat, floatToInt32Array} from './variable.js'
+import {Variable, encodeFloat64, decodeFloat64} from './variable.js'
 
 /**
  * An expression of variable terms and a constant.
@@ -157,31 +157,32 @@ export class Expression {
 	}
 
 	public toBinary(): Int32Array {
-		const terms_array = this._terms.array.reduce((prev: any, pair: any) => {
+		const terms_data = this._terms.array.reduce((prev: any, pair: any) => {
 			const variable_data = pair.first.toBinary()
-			const coefficient = floatToInt32Array(pair.second)
-			return [...prev, ...variable_data, ...coefficient]
+			const coefficient_data = new Int32Array(2)
+			encodeFloat64(coefficient_data, 0, pair.second)
+			return [...prev, ...variable_data, ...coefficient_data]
 		}, [])
 
 		const nterms = this._terms.array.length
-		return new Int32Array([nterms, ...terms_array, this._constant])
+		return new Int32Array([nterms, ...terms_data, this._constant])
 	}
 
 	static fromBinary(data: Int32Array) {
-		const nterms = data.at(0) as number
-
 		let terms = createMap<Variable, number>()
-		let offset = 1
-		let n = 0
+		let offset = 0, n = 0
+
+		const nterms = data.at(offset++) as number
 
 		while (n < nterms && offset < data.length) {
 			const variable_data_size = data.at(offset) as number
 			const variable_data = data.subarray(offset, offset + variable_data_size)
 			const variable = Variable.fromBinary(variable_data)
 			offset += variable_data_size
-			const coefficient = int32ArrayToFloat(data.subarray(offset, offset + 2))
+			const coefficient = decodeFloat64(data, offset)
 
 			terms.insert(variable, coefficient)
+			
 			offset += 2
 			n++
 		}
