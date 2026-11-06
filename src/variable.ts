@@ -214,7 +214,7 @@ export class Variable {
 
 		data[offset++] = size
 		data[offset++] = this._id
-		data.set(floatToInt32Array(this._value), offset)
+		encodeFloat64(data, offset, this._value)
 		offset += 2
 		data[offset++] = this._sharedOutputIndex
 		data[offset++] = this._notify
@@ -239,7 +239,7 @@ export class Variable {
 		let offset = 0
 		const size = data.at(offset++) as number
 		variable._id = data.at(offset++) as number
-		variable._value = int32ArrayToFloat(data.subarray(offset, offset + 2))
+		variable._value = decodeFloat64(data, offset)
 		offset += 2
 		variable._sharedOutputIndex = data.at(offset++) as number
 		variable._notify = data.at(offset++) as number
@@ -325,16 +325,18 @@ function int32ArrayToString(int32Array: Int32Array) : string | undefined {
 		return decoder.decode(u8Array.subarray(0, end));
 }
 
-export function floatToInt32Array(value: number) : Int32Array {
-	const int_value = Math.trunc(value)
-	const dec_value = Math.round((value - Math.trunc(value)) * Math.pow(10, 6))
-
-	return new Int32Array([int_value, dec_value])
+export function encodeFloat64(data: Int32Array, offset: number, value: number) : void {
+	let data_view = new DataView(data.buffer)
+	data_view.setFloat64(offset * 4, value, false)
 }
 
-export function int32ArrayToFloat(value: Int32Array) : number {
-	const int_value = value.at(0) as number
-	const dec_value = value.at(1) as number
+export function decodeFloat64(data: Int32Array, offset: number) : number {
+	let data_view = new DataView(data.buffer)
+	const value = data_view.getFloat64(offset * 4, false)
+	return nearZeroValue(value) ? 0.0 : value
+}
 
-	return Number((int_value + (dec_value / Math.pow(10, 6))).toFixed(6))
+function nearZeroValue(value: number): boolean {
+	let eps = 1.0e-8
+	return value < 0 ? -value < eps : value < eps
 }
