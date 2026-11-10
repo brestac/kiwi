@@ -982,10 +982,14 @@ export class Solver {
 	}
 
 	public toString() : String {
-		const constraints = this.getConstraints();
-		const description = constraints.map(cst => cst.toString()).join("\n")
+		const constraints = this.getConstraints()
+		const description = constraints.map((constraint: Constraint) => constraint.toString()).join("\n")
 
 		return `${this.constructor.name}: ${constraints.length} constraints, ${this._varMap.array.length} variables\n${description}`
+	}
+
+	protected print() : void {
+		console.log(this.toString())
 	}
 
 	public isAsync(): boolean {
