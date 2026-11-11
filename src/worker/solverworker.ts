@@ -108,6 +108,20 @@ export class SolverWorker extends Solver {
     return this._varMap.array[i]?.first
   }
 
+  protected print(): void {
+    // We need to update variables value because we didn't in updateVariables()
+    // In worker mode, variable value property is not accessible outside the worker
+    const constraints = this.getConstraints()
+    constraints.forEach((constraint: Constraint) => {
+      constraint.getVariables().values().forEach((variable: Variable) => {
+        const value = Atomics.load(this._output, variable._sharedOutputIndex) / this._coefficient
+        variable._setValue(value)
+      })
+    })
+
+    super.print()
+  }
+
   public run(updatesMs: number): void {
     if (updatesMs === 0) {
       this.run_no_limit()
@@ -216,7 +230,7 @@ export class SolverWorker extends Solver {
         Atomics.notify(this._timeSeq, 0)
         break
       case SolverCommand.PRINT:
-        console.log(this.toString())
+        this.print()
   		default:
   			break
   	}

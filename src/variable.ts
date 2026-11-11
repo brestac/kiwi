@@ -112,6 +112,10 @@ export class Variable {
 		}
 	}
 
+	public _setValue(value: number): void {
+		this._value = value
+	}
+
 	/**
 	 * Set a callback for whenever the value changes.
 	 *
