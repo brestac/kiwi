@@ -1,5 +1,6 @@
 import {createMap, IMap} from './maptype.js'
 import {Variable} from './variable.js'
+import type {Pair} from './maptype.js'
 
 /**
  * An expression of variable terms and a constant.
